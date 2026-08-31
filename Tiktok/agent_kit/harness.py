@@ -1,0 +1,317 @@
+"""Training harness: the fixed scaffold the agent configures rather than rewrites.
+
+An experiment is a config dict with four pluggable slots --
+
+    {'features': {...}, 'model': {...}, 'loss': {...}, 'train': {...}}
+
+-- and run_experiment() turns that into validation metrics. The scaffold owns
+everything that must not drift between experiments: the split, the encoder, the
+metric, seed handling, early stopping and the unbiased check.
+
+Test is never touched here. run_experiment evaluates on validation and on the
+randomised-exposure log only; scoring the hidden split is a separate, explicit
+step in final_eval.py, run once on the submission the agent designates.
+"""
+import copy
+import json
+import time
+
+import numpy as np
+import torch
+
+from . import dataset as D
+from .metrics import fast_evaluate, rank_context, within_user_rank
+# Imported as modules, not as names: the agent may extend models.py / losses.py
+# mid-run, and experiment.reload_plugins() reloads those two modules. Binding the
+# functions here would pin the old code and silently ignore the agent's edits,
+# while reloading this module instead would throw away the encoded-data cache.
+from . import models as _models
+from . import losses as _losses
+
+torch.set_num_threads(max(1, (torch.get_num_threads() or 4)))
+
+_PREPARED = {}          # in-process cache: feature config -> Prepared
+
+
+# ------------------------------------------------------------------ data ---
+class UserGroups:
+    """Within-user positive/negative row indices, for the ranking samplers."""
+
+    def __init__(self, user_ids, y):
+        _, ucode = np.unique(user_ids, return_inverse=True)
+        ucode = ucode.astype(np.int64)
+        n_users = int(ucode.max()) + 1
+        self.ucode = ucode
+        self.n_users = n_users
+
+        pos_rows = np.flatnonzero(y > 0)
+        neg_rows = np.flatnonzero(y <= 0)
+        self.pos_flat, self.pos_off, self.pos_cnt = self._group(pos_rows, ucode, n_users)
+        self.neg_flat, self.neg_off, self.neg_cnt = self._group(neg_rows, ucode, n_users)
+
+        # A user with no negative (or no positive) contributes no within-user
+        # comparison -- and is exactly the user GAUC also discards.
+        self.eligible_pos = self.pos_flat[self.neg_cnt[ucode[self.pos_flat]] > 0]
+        self.n_eligible_users = int(((self.pos_cnt > 0) & (self.neg_cnt > 0)).sum())
+
+    @staticmethod
+    def _group(rows, ucode, n_users):
+        u = ucode[rows]
+        order = np.argsort(u, kind='stable')
+        flat = rows[order]
+        cnt = np.bincount(u, minlength=n_users).astype(np.int64)
+        off = np.concatenate(([0], np.cumsum(cnt)))
+        return flat, off, cnt
+
+    def sample_pairs(self, rng, batch):
+        """(pos_rows, neg_rows): a positive and a negative from the same user.
+
+        Positives are drawn uniformly, which weights each user by their positive
+        count -- the same weighting GAUC applies when it averages per-user AUC.
+        """
+        p = self.eligible_pos[rng.integers(0, len(self.eligible_pos), batch)]
+        u = self.ucode[p]
+        j = (rng.random(batch) * self.neg_cnt[u]).astype(np.int64)
+        return p, self.neg_flat[self.neg_off[u] + j]
+
+    def sample_groups(self, rng, batch, group_size):
+        """(batch, group_size) rows; column 0 positive, rest negatives, same user."""
+        p = self.eligible_pos[rng.integers(0, len(self.eligible_pos), batch)]
+        u = self.ucode[p]
+        m = group_size - 1
+        j = (rng.random((batch, m)) * self.neg_cnt[u][:, None]).astype(np.int64)
+        negs = self.neg_flat[self.neg_off[u][:, None] + j]
+        return np.concatenate([p[:, None], negs], axis=1)
+
+
+class Prepared:
+    """Encoded splits plus everything the training loop needs, built once."""
+
+    def __init__(self, feat_cfg):
+        frames = D.load_frames()
+        self.feat_cfg = copy.deepcopy(feat_cfg)
+        self.encoder = D.fit_base_encoder(frames['train'], feat_cfg)
+        self.total_dim = self.encoder.total_dim
+        self.n_fields = len(self.encoder.fields)
+
+        self.X = {s: self.encoder.transform(fr) for s, fr in frames.items()}
+        self.y = {s: frames[s]['y'] for s in frames}
+        self.users = {s: frames[s]['user_id'] for s in frames}
+        self.groups = UserGroups(self.users['train'], self.y['train'])
+
+        # unbiased check: randomised-exposure log over the validation window
+        rnd = D.load_random_frame()
+        self.X['unbiased'] = self.encoder.transform(rnd)
+        self.y['unbiased'] = rnd['y']
+        self.users['unbiased'] = rnd['user_id']
+
+        self.T = {s: torch.from_numpy(x.astype(np.int64)) for s, x in self.X.items()}
+        self.Ty = {s: torch.from_numpy(v) for s, v in self.y.items()}
+
+
+def prepare(feat_cfg=None):
+    key = json.dumps(feat_cfg or {}, sort_keys=True)
+    if key not in _PREPARED:
+        _PREPARED[key] = Prepared(feat_cfg or {})
+    return _PREPARED[key]
+
+
+# -------------------------------------------------------------- training ---
+@torch.no_grad()
+def predict(model, T, chunk=200_000):
+    model.eval()
+    out = []
+    for i in range(0, len(T), chunk):
+        out.append(model(T[i:i + chunk]).detach().numpy())
+    return np.concatenate(out) if out else np.zeros(0, dtype=np.float32)
+
+
+def evaluate_split(model, prep, split):
+    return fast_evaluate(prep.users[split], prep.y[split], predict(model, prep.T[split]))
+
+
+def train_once(cfg, prep, seed, log=None, deadline=None, prune_fn=None):
+    """Train one seed. Returns metrics for the best-validation epoch."""
+    tcfg = cfg.get('train', {})
+    lr = tcfg.get('lr', 0.001)
+    batch = tcfg.get('batch', 8192)
+    epochs = tcfg.get('epochs', 40)
+    patience = tcfg.get('patience', 4)
+    l2 = tcfg.get('l2', 1e-6)
+    group_size = tcfg.get('group_size', 8)
+    steps = tcfg.get('steps_per_epoch') or int(np.ceil(len(prep.y['train']) / batch))
+
+    torch.manual_seed(int(seed))
+    # Everything from here to the end of training is model code, including the
+    # forward passes used for evaluation. Lock held-out data for the whole span:
+    # a model that reaches for frames['valid'] now fails loudly instead of
+    # silently scoring itself on the answers.
+    D.lock_eval_access('a model is being built and trained')
+    try:
+        model = _models.build_model(cfg.get('model', {}), prep.total_dim,
+                                    prep.n_fields, seed=seed)
+        loss_fn = _losses.build_loss(cfg.get('loss', {}))
+        return _train_loop(cfg, prep, seed, model, loss_fn, log, deadline,
+                           tcfg, prune_fn)
+    finally:
+        D.unlock_eval_access()
+
+
+def _train_loop(cfg, prep, seed, model, loss_fn, log, deadline, tcfg,
+                prune_fn=None):
+    lr = tcfg.get('lr', 0.001)
+    batch = tcfg.get('batch', 8192)
+    epochs = tcfg.get('epochs', 40)
+    patience = tcfg.get('patience', 4)
+    l2 = tcfg.get('l2', 1e-6)
+    group_size = tcfg.get('group_size', 8)
+    steps = tcfg.get('steps_per_epoch') or int(np.ceil(len(prep.y['train']) / batch))
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2)
+    rng = np.random.default_rng(seed)
+    Ttr, Tytr = prep.T['train'], prep.Ty['train']
+
+    best, best_state, best_epoch, bad = -1.0, None, 0, 0
+    history = []
+    for ep in range(1, epochs + 1):
+        model.train()
+        t0 = time.time()
+        tot = 0.0
+        # pointwise sweeps a fresh permutation of every row, as baseline.py does;
+        # the ranking samplers draw comparisons instead, so they sample per step
+        perm = rng.permutation(len(Tytr)) if loss_fn.batch_kind == 'point' else None
+        for st in range(steps):
+            if loss_fn.batch_kind == 'point':
+                idx = perm[st * batch:(st + 1) * batch]
+                if len(idx) == 0:
+                    continue
+                bt = {'X': Ttr[idx], 'y': Tytr[idx]}
+            elif loss_fn.batch_kind == 'pair':
+                p, n = prep.groups.sample_pairs(rng, batch)
+                bt = {'Xp': Ttr[p], 'Xn': Ttr[n]}
+            else:
+                g = prep.groups.sample_groups(rng, batch, group_size)
+                bt = {'Xg': Ttr[g.reshape(-1)].reshape(g.shape[0], g.shape[1], -1)}
+            loss = loss_fn(model, bt)
+            if not torch.isfinite(loss):
+                raise RuntimeError(
+                    'non-finite loss at epoch %d (lr=%g, loss=%s); diverged'
+                    % (ep, lr, cfg.get('loss', {}).get('type', 'bce')))
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            opt.step()
+            tot += float(loss.detach())
+
+        va = evaluate_split(model, prep, 'valid')
+        rec = {'epoch': ep, 'train_loss': tot / steps, 'secs': round(time.time() - t0, 1),
+               'valid': {k: round(va[k], 6) for k in ('GAUC', 'nDCG@5', 'primary')}}
+        history.append(rec)
+        if log:
+            log(rec)
+
+        if va['primary'] > best + 1e-5:
+            best, bad, best_epoch = va['primary'], 0, ep
+            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+        else:
+            bad += 1
+            if bad >= patience:
+                break
+
+        # ASHA: stop a trial that is clearly out of contention at a rung.
+        # Judged on best-so-far, never the current epoch, because these curves
+        # are non-monotonic -- most configs peak then decay.
+        if prune_fn is not None and prune_fn(ep, best):
+            rec['stopped'] = 'pruned'
+            break
+
+        # Soft deadline: stop cleanly and keep the best checkpoint rather than
+        # letting one slow config eat the run's wall-clock budget.
+        if deadline is not None and time.time() > deadline:
+            rec['stopped'] = 'time_budget'
+            break
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    return {'model': model, 'best_epoch': best_epoch, 'history': history,
+            'stopped_early': any('stopped' in h for h in history),
+            'valid': evaluate_split(model, prep, 'valid'),
+            'unbiased': evaluate_split(model, prep, 'unbiased')}
+
+
+def _mean_std(vals):
+    a = np.asarray(vals, dtype=np.float64)
+    return float(a.mean()), float(a.std())
+
+
+def run_experiment(cfg, seeds=(0, 1, 2), keep_models=False, log=None,
+                   time_budget_s=None, reporter=None, prune_fn=None):
+    """Train over seeds and report mean validation metrics. Never touches test.
+
+    time_budget_s is PER SEED. It was previously one deadline shared by all
+    seeds, which failed badly: once it expired, every remaining seed stopped
+    after exactly one epoch (the check sits at the end of the epoch body), so a
+    slow config silently returned a mixture of trained and untrained models.
+    That depressed the mean and inflated the spread -- and it penalised exactly
+    the well-regularised configs that need more epochs, which were the ones
+    working. Per-seed budgets make every seed comparable.
+    """
+    t0 = time.time()
+    prep = prepare(cfg.get('features'))
+    runs, models = [], []
+    # Per-seed predictions, kept so the SEED ENSEMBLE can be scored below. This
+    # is the quantity submit_final.py actually ships, and it is not the same as
+    # the mean of per-seed metrics.
+    preds = {'valid': [], 'unbiased': []}
+    for s in seeds:
+        deadline = (time.time() + time_budget_s) if time_budget_s else None
+        # bind the seed so the reporter can label each epoch line
+        seed_log = (lambda rec, _s=s: log(_s, rec)) if log else None
+        r = train_once(cfg, prep, s, log=seed_log, deadline=deadline,
+                       prune_fn=prune_fn)
+        if reporter is not None:
+            reporter.seed_done(s, r)
+        if keep_models:
+            models.append(r['model'])
+        runs.append({k: r[k] for k in ('best_epoch', 'history', 'valid',
+                                       'unbiased', 'stopped_early')})
+        for split in preds:
+            preds[split].append(predict(r['model'], prep.T[split]).astype(np.float64))
+
+    out = {'config': copy.deepcopy(cfg), 'seeds': list(seeds),
+           'wall_clock_s': round(time.time() - t0, 1),
+           'best_epochs': [r['best_epoch'] for r in runs]}
+    for split in ('valid', 'unbiased'):
+        for metric in ('GAUC', 'nDCG@5', 'primary'):
+            m, sd = _mean_std([r[split][metric] for r in runs])
+            out['%s_%s' % (split, metric)] = round(m, 6)
+            out['%s_%s_std' % (split, metric)] = round(sd, 6)
+    out['per_seed_valid_primary'] = [round(r['valid']['primary'], 6) for r in runs]
+    out['epochs_run'] = [len(r['history']) for r in runs]
+    out['secs_per_epoch'] = [round(sum(h['secs'] for h in r['history'])
+                                   / max(1, len(r['history'])), 1) for r in runs]
+    out['timed_out_seeds'] = [bool(r.get('stopped_early')) for r in runs]
+
+    # The seed ENSEMBLE, scored the way the submission is built: average the
+    # seeds' within-user ranks, then evaluate once. Averaging ranks rather than
+    # raw scores because different seeds put logits on different scales and the
+    # metric only reads per-user ordering.
+    #
+    # Reported as an EXTRA field, never in place of valid_primary: over a
+    # hundred journal entries were measured as the mean of per-seed metrics and
+    # redefining that number retroactively would make the history incomparable.
+    # The two answer different questions -- the mean says "how good is this
+    # config on average", the ensemble says "how good is what I would submit".
+    if len(runs) > 1:
+        for split in ('valid', 'unbiased'):
+            ctx = rank_context(prep.users[split])
+            acc = np.zeros(len(prep.users[split]), dtype=np.float64)
+            for p in preds[split]:
+                acc += within_user_rank(p, *ctx)
+            m = fast_evaluate(prep.users[split], prep.y[split], acc / len(preds[split]))
+            for metric in ('GAUC', 'nDCG@5', 'primary'):
+                out['%s_%s_seedens' % (split, metric)] = round(m[metric], 6)
+        out['seedens_gain'] = round(
+            out['valid_primary_seedens'] - out['valid_primary'], 6)
+    out['runs'] = runs
+    if keep_models:
+        out['models'] = models
+    return out

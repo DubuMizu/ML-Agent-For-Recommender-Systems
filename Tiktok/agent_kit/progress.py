@@ -1,0 +1,197 @@
+"""Live terminal reporting for the agent loop.
+
+Without this a single experiment prints nothing for five to fifteen minutes and
+then emits one line, which makes a long run impossible to supervise: you cannot
+tell a slow config from a hung one, or a model that is still climbing from one
+that peaked at epoch 2 and is now collapsing.
+
+Everything here is plain text with optional ANSI. Colour is disabled
+automatically when stdout is not a TTY, so redirecting to a log file stays
+readable.
+
+Every event is ALSO mirrored into agent_kit/status.py, which is what the live
+dashboard renders. Printing and status-writing are deliberately the same call
+site: an event that reaches the log but not the dashboard (or the reverse) is
+a bug that only shows up hours into a run.
+"""
+import os
+import sys
+import time as _time
+
+from . import status as _status
+from .journal import FM_VALID_PRIMARY, ORACLE_VALID_PRIMARY
+
+_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty() \
+    and os.environ.get('NO_COLOR') is None
+
+
+def _c(code, text):
+    return '\033[%sm%s\033[0m' % (code, text) if _TTY else text
+
+
+DIM, BOLD, GREEN, YELLOW, RED, CYAN = '2', '1', '32', '33', '31', '36'
+
+
+def describe(cfg):
+    """One-line config summary, the parts that actually vary between runs."""
+    if not isinstance(cfg, dict):
+        return str(cfg)
+    m, l, t = cfg.get('model') or {}, cfg.get('loss') or {}, cfg.get('train') or {}
+    bits = ['%s/%s' % (m.get('type', 'fm'), l.get('type', 'bce'))]
+    for src, keys in ((m, ('k', 'p', 'L', 'hidden')),
+                      (t, ('lr', 'l2', 'batch', 'group_size'))):
+        for k in keys:
+            if k in src:
+                bits.append('%s=%s' % (k, src[k]))
+    return ' '.join(bits)
+
+
+RANDOM_VALID_PRIMARY = 0.4834          # baseline_scores.json, random scorer
+
+
+def headroom_bar(primary, width=30):
+    """Where this score sits between a random scorer and the oracle ceiling.
+
+    The bar spans random -> oracle with the FM baseline marked as `|`, because a
+    bar spanning FM -> oracle is empty for every result we can realistically
+    produce (the best so far is under 1% of that span) and so shows nothing.
+    The percentage quoted alongside is still measured against FM, since beating
+    FM is the actual objective.
+
+    Both reference points are deliberate: the oracle is 0.8484, not 1.0, because
+    27% of validation users are all-negative and score nDCG 0 for any model.
+    """
+    lo, hi = RANDOM_VALID_PRIMARY, ORACLE_VALID_PRIMARY
+    pos = int(round(max(0.0, min(1.0, (primary - lo) / (hi - lo))) * width))
+    fm = int(round((FM_VALID_PRIMARY - lo) / (hi - lo) * width))
+    cells = []
+    for i in range(width):
+        if i == fm:
+            cells.append('|')                      # FM baseline marker
+        elif i < pos:
+            cells.append('#')
+        else:
+            cells.append('.')
+    head = (primary - FM_VALID_PRIMARY) / (ORACLE_VALID_PRIMARY - FM_VALID_PRIMARY)
+    return 'rnd[%s]oracle  %+.2f%% of FM->oracle headroom' % (''.join(cells), head * 100)
+
+
+class Reporter:
+    """Prints per-epoch, per-seed and per-iteration progress."""
+
+    def __init__(self, enabled=True, stream=None):
+        self.enabled = enabled
+        self.stream = stream or sys.stdout
+        self._label = ''
+
+    def _w(self, line):
+        if not self.enabled:
+            return
+        try:
+            self.stream.write(line + '\n')
+            self.stream.flush()
+        except (ValueError, OSError):
+            pass                                  # never let logging kill a run
+
+    # ---------------------------------------------------------- lifecycle --
+    def start(self, iteration, cfg, hypothesis=None, seeds=(), budget=None):
+        self._label = 'iter %s' % iteration
+        self._w('')
+        self._w(_c(BOLD, '=== %s  %s' % (self._label, describe(cfg))))
+        if hypothesis:
+            self._w(_c(DIM, '    ' + str(hypothesis)[:150]))
+        self._w(_c(DIM, '    seeds=%s  budget=%ss/seed  FM baseline=%.4f'
+                   % (list(seeds), budget, FM_VALID_PRIMARY)))
+        _status.update(phase='training', phase_detail=str(iteration))
+        _status.set_section('current', {
+            'label': str(iteration), 'config': describe(cfg), 'config_full': cfg,
+            'hypothesis': str(hypothesis or '')[:400], 'seeds': list(seeds),
+            'seed': None, 'epoch': 0, 'started': _time.time(), 'budget_s': budget,
+            'epochs': (cfg.get('train') or {}).get('epochs', 40)
+                      if isinstance(cfg, dict) else 40,
+            'epoch_hist': [], 'valid': None})
+
+    def epoch(self, seed, rec):
+        """One line per epoch: the accuracy as it moves."""
+        v = rec['valid']
+        d = v['primary'] - FM_VALID_PRIMARY
+        colour = GREEN if d > 0 else (YELLOW if d > -0.002 else RED)
+        self._w('  s%d e%02d  loss %8.4f   GAUC %.4f  nDCG@5 %.4f  %s  %s  %4.0fs'
+                % (seed, rec['epoch'], rec['train_loss'], v['GAUC'], v['nDCG@5'],
+                   _c(BOLD, 'valid %.4f' % v['primary']),
+                   _c(colour, '%+.4f' % d), rec['secs']))
+        _status.patch('current', seed=seed, epoch=rec['epoch'],
+                      train_loss=rec['train_loss'], secs_per_epoch=rec['secs'],
+                      valid=v['primary'], GAUC=v['GAUC'], ndcg=v['nDCG@5'])
+        _status.push_epoch(v['primary'])
+
+    def seed_done(self, seed, res):
+        self._w(_c(DIM, '  s%d done: best %.4f @ep%d  (%d epochs%s)'
+                   % (seed, res['valid']['primary'], res['best_epoch'],
+                      len(res['history']),
+                      ', TIMED OUT' if res.get('stopped_early') else '')))
+        _status.event('warn' if res.get('stopped_early') else 'ok',
+                      'seed %d: %.4f @ep%d%s'
+                      % (seed, res['valid']['primary'], res['best_epoch'],
+                         ' (timed out)' if res.get('stopped_early') else ''))
+        _status.patch('current', epoch_hist=[])
+
+    def finish(self, res, iteration=None, is_best=False):
+        if res.get('status') not in (None, 'ok', 'timeout'):
+            self._w(_c(RED, '=== %s FAILED: %s' % (self._label, res.get('error'))))
+            self._w(_c(DIM, '    recovery: %s' % res.get('hint')))
+            _status.bump('failed')
+            _status.event('fail', '%s failed: %s' % (self._label, res.get('error')))
+            _status.update(phase='reflecting', phase_detail='recovering from a failure')
+            return
+        p = res['valid_primary']
+        d = p - FM_VALID_PRIMARY
+        self._w(_c(BOLD, '--- %s RESULT  valid %.4f +-%.4f   %s vs FM%s'
+                   % (self._label, p, res.get('valid_primary_std', 0.0),
+                      _c(GREEN if d > 0 else RED, '%+.4f' % d),
+                      _c(GREEN + ';1', '   ** NEW BEST **') if is_best else '')))
+        self._w('    GAUC %.4f | nDCG@5 %.4f | unbiased %.4f | %s'
+                % (res['valid_GAUC'], res['valid_nDCG@5'],
+                   res['unbiased_primary'], headroom_bar(p)))
+        se = res.get('valid_primary_seedens')
+        if se is not None:
+            self._w('    seed-ensemble %s (%+.4f vs the mean) -- this is what a '
+                    'submission of this config would score'
+                    % (_c(BOLD, '%.4f' % se), res.get('seedens_gain', 0.0)))
+        self._w(_c(DIM, '    per-seed %s | epochs %s | %.0fs%s'
+                   % ([round(x, 4) for x in res.get('per_seed_valid_primary', [])],
+                      res.get('epochs_run'), res.get('wall_clock_s', 0),
+                      _c(YELLOW, '  [TIMEOUT - lower bound]')
+                      if res.get('status') == 'timeout' else '')))
+        _status.bump('timeout' if res.get('status') == 'timeout' else 'ok')
+        _status.event('best' if is_best else
+                      ('warn' if res.get('status') == 'timeout' else 'ok'),
+                      '%s %.4f (%+.4f vs FM)%s'
+                      % (self._label, p, d, '  ** NEW BEST **' if is_best else ''))
+        _status.update(phase='reflecting', phase_detail='reading the result')
+
+    def scoreboard(self, journal, limit=18):
+        """Compact history so the trend is visible at a glance."""
+        runs = [e for e in journal.entries if e.get('valid_primary') is not None]
+        if not runs:
+            return
+        best = max(r['valid_primary'] for r in runs)
+        cells = []
+        for e in runs[-limit:]:
+            v = e['valid_primary']
+            mark = '*' if v == best else ' '
+            colour = GREEN if v > FM_VALID_PRIMARY else DIM
+            cells.append(_c(colour, '%d:%.4f%s' % (e['iteration'], v, mark)))
+        self._w(_c(DIM, '    history: ') + '  '.join(cells))
+        self._w(_c(DIM, '    best %.4f (%+.4f vs FM)   %s'
+                   % (best, best - FM_VALID_PRIMARY, headroom_bar(best))))
+        b = max(runs, key=lambda e: e['valid_primary'])
+        _status.set_section('best', {
+            'iteration': b['iteration'], 'valid': b['valid_primary'],
+            'delta': b.get('delta_vs_fm'), 'GAUC': b.get('valid_GAUC'),
+            'ndcg': b.get('valid_nDCG@5'), 'unbiased': b.get('unbiased_primary'),
+            'config': describe(b.get('config')), 'config_full': b.get('config'),
+            'hypothesis': (b.get('hypothesis') or '')[:200]})
+        _status.set_section('history',
+                            [{'iteration': e['iteration'], 'valid': e['valid_primary'],
+                              'status': e.get('status')} for e in runs[-60:]])

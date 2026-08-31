@@ -1,0 +1,256 @@
+"""ASHA + Bayesian optimisation + ensemble selection as one pipeline.
+
+The three pieces are not independent, and running them in sequence leaves the
+main gain on the table. The measured reason, from this run's own data:
+
+    din_dropout scored 0.6036 alone -- identical to fm_dropout, i.e. worthless
+    as a replacement. But it was the strongest ensemble member (0.6045 for its
+    own 3 seeds, and the best unbiased score), because its errors are
+    decorrelated from FM's.
+
+So "the best model" and "the most useful model" are different questions, and a
+search that only ever maximises individual score will systematically discard the
+models that would have helped most. This pipeline therefore:
+
+  * runs BO+ASHA within each of several STRUCTURAL FAMILIES (different losses
+    and architectures), instead of one search over everything -- structural
+    variety is what generates decorrelated errors, and it is too coarse and too
+    expensive for BO to discover by itself;
+  * keeps EVERY trained model in a library, not just the winners;
+  * picks the final ensemble by greedy forward selection with replacement
+    (Caruana et al., 2004), which optimises the ensemble directly.
+
+One deliberate restraint: BO's objective stays the INDIVIDUAL validation score,
+not marginal ensemble gain. Marginal gain shrinks as the library grows, so the
+objective would drift under the GP's stationarity assumption and the surrogate
+would model an average of two different functions. Diversity is instead
+guaranteed structurally, by the family split.
+"""
+import copy
+import time
+
+import numpy as np
+
+from .experiment import safe_run
+from .harness import prepare, train_once, predict
+# within_user_rank moved to metrics.py so the harness can use it too without
+# an import cycle; re-exported here because submit_final.py imports it from
+# this module.
+from .metrics import fast_evaluate, group_offsets, within_user_rank
+from .search import AshaPruner, Space, suggest, OBSERVED_NOISE_SD
+from .journal import FM_VALID_PRIMARY
+
+
+class ModelLibrary:
+    """Per-model within-user ranks, kept for every model ever trained."""
+
+    def __init__(self, prep):
+        self.prep = prep
+        self.entries = []                       # {key, config, seed, score, ranks}
+        self._idx = {}
+        for split in ('valid', 'unbiased'):
+            u = prep.users[split]
+            starts = group_offsets(np.sort(u))
+            self._idx[split] = (u, starts, np.diff(starts))
+
+    def add(self, key, config, seed, model, individual_score):
+        ranks = {}
+        for split in ('valid', 'unbiased'):
+            s = predict(model, self.prep.T[split]).astype(np.float64)
+            users, starts, sizes = self._idx[split]
+            ranks[split] = within_user_rank(s, users, starts, sizes)
+        self.entries.append({'key': key, 'config': copy.deepcopy(config),
+                             'seed': seed, 'score': individual_score, 'ranks': ranks})
+        return self.entries[-1]
+
+    def __len__(self):
+        return len(self.entries)
+
+    def matrix(self, split):
+        return np.stack([e['ranks'][split] for e in self.entries])
+
+    def score_subset(self, idx, split='valid'):
+        """Validation primary of the mean-rank ensemble over `idx` (with repeats)."""
+        if len(idx) == 0:
+            return 0.0
+        acc = np.zeros(len(self.entries[0]['ranks'][split]), dtype=np.float64)
+        for i in idx:
+            acc += self.entries[i]['ranks'][split]
+        u = self.prep.users[split]
+        y = self.prep.y[split]
+        return fast_evaluate(u, y, acc / len(idx))['primary']
+
+
+def greedy_select(library, max_size=12, sorted_init=3, bags=5, bag_frac=0.7,
+                  rng=None, verbose=True):
+    """Caruana-style forward selection with replacement, bagged.
+
+    With replacement so a strong model can be added twice, which is how this
+    scheme expresses weights without fitting any.
+
+    Bagged because greedy selection maximises a validation number directly and
+    will happily overfit it -- each bag selects from a random subset of the
+    library and the final weights are the average selection frequency, which is
+    the standard defence.
+    """
+    rng = rng or np.random.default_rng(0)
+    n = len(library)
+    counts = np.zeros(n)
+    for b in range(bags):
+        # min(n, ...) because the floor of 3 exceeds the population whenever the
+        # library is tiny -- a short exploratory portfolio, or one where most
+        # trials failed -- and rng.choice then raises instead of just bagging
+        # everything it has.
+        pool = rng.choice(n, size=min(n, max(3, int(round(bag_frac * n)))), replace=False)
+        order = sorted(pool, key=lambda i: -library.entries[i]['score'])
+        chosen = list(order[:sorted_init])       # sorted initialisation
+        best = library.score_subset(chosen)
+        for _ in range(max_size - len(chosen)):
+            cand_best, cand_score = None, best
+            for i in pool:
+                s = library.score_subset(chosen + [i])
+                if s > cand_score:
+                    cand_best, cand_score = i, s
+            if cand_best is None:
+                break                            # no addition helps: stop
+            chosen.append(cand_best)
+            best = cand_score
+        for i in chosen:
+            counts[i] += 1.0 / len(chosen)
+        if verbose:
+            print('    bag %d/%d: %d members, valid %.4f'
+                  % (b + 1, bags, len(chosen), best), flush=True)
+    counts /= counts.sum()
+    return counts
+
+
+def weighted_metrics(library, weights, split='valid'):
+    """Full metric dict for the weighted ensemble.
+
+    Returns GAUC and nDCG@5 as well as primary. Reporting only `primary` once
+    cost a full retrain to answer "how much did nDCG@5 move?" -- the components
+    are free to compute here and impossible to recover later, because the model
+    library is in memory only.
+    """
+    acc = np.zeros(len(library.entries[0]['ranks'][split]), dtype=np.float64)
+    for w, e in zip(weights, library.entries):
+        if w > 0:
+            acc += w * e['ranks'][split]
+    u, y = library.prep.users[split], library.prep.y[split]
+    return fast_evaluate(u, y, acc)
+
+
+def weighted_score(library, weights, split='valid'):
+    return weighted_metrics(library, weights, split)['primary']
+
+
+def _apply(base, params):
+    cfg = copy.deepcopy(base)
+    for key, val in params.items():
+        section, _, name = key.partition('.')
+        cfg.setdefault(section, {})[name] = val
+    return cfg
+
+
+def run(families, n_init=2, n_iter=3, seeds=(0, 1), time_budget_s=400,
+        journal=None, reporter=None, rng_seed=0, max_ensemble=12):
+    """BO + ASHA inside each family, then one greedy ensemble across all of them."""
+    prep = prepare()
+    library = ModelLibrary(prep)
+    rng = np.random.default_rng(rng_seed)
+    t0 = time.time()
+    trials = []
+
+    for fam_name, (base_cfg, space_spec) in families.items():
+        space = Space(space_spec)
+        pruner = AshaPruner()
+        X, y = [], []
+        print('\n### family %s' % fam_name, flush=True)
+        for i in range(n_init + n_iter):
+            if i < n_init or len(y) < 2:
+                u = space.sample(rng, 1)[0]
+                how = 'init'
+            else:
+                u, _ = suggest(space, np.array(X), np.array(y), rng)
+                how = 'bayes'
+            params = space.from_unit(u)
+            u = space.to_unit(params)            # quantised point actually run
+            cfg = _apply(base_cfg, params)
+
+            res = safe_run(cfg, seeds=seeds, time_budget_s=time_budget_s,
+                           reporter=reporter, hypothesis='[%s] %s' % (fam_name, how),
+                           iteration='%s %d/%d' % (fam_name, i + 1, n_init + n_iter),
+                           prune_fn=pruner.make_callback(), keep_models=True)
+            if reporter is not None:
+                reporter.finish(res, iteration='%s %d' % (fam_name, i + 1))
+            score = res.get('valid_primary')
+            if score is None:
+                trials.append({'family': fam_name, 'status': res['status'],
+                               'error': res.get('error')})
+                continue
+            X.append(u)
+            y.append(score)
+            for si, m in zip(seeds, res.get('models', [])):
+                library.add('%s#%d:s%d' % (fam_name, i, si), cfg, si, m,
+                            res['per_seed_valid_primary'][list(seeds).index(si)])
+            trials.append({'family': fam_name, 'params': params,
+                           'score': round(score, 6), 'how': how,
+                           'unbiased': res.get('unbiased_primary')})
+            if journal is not None:
+                journal.record(
+                    hypothesis='[%s %s] BO+ASHA trial, kept for the ensemble library'
+                               % (fam_name, how),
+                    rationale='Structural family %s; BO over %s; every trained model '
+                              'enters the ensemble library regardless of rank.'
+                              % (fam_name, list(space_spec)),
+                    config=cfg, result=res, status=res['status'],
+                    error=res.get('error'), tags=['ensemble-search', fam_name, how])
+
+    print('\n### greedy ensemble selection over %d models' % len(library), flush=True)
+    weights = greedy_select(library, max_size=max_ensemble, rng=rng)
+    keep = [(w, library.entries[i]['key']) for i, w in enumerate(weights) if w > 0]
+    keep.sort(reverse=True)
+
+    singles = [e['score'] for e in library.entries]
+    out = {
+        'n_models': len(library),
+        'best_single': round(max(singles), 6),
+        'mean_single': round(float(np.mean(singles)), 6),
+        'ensemble_valid': round(weighted_score(library, weights, 'valid'), 6),
+        'ensemble_unbiased': round(weighted_score(library, weights, 'unbiased'), 6),
+        'ensemble_valid_full': {k: round(v, 6) for k, v in
+                                weighted_metrics(library, weights, 'valid').items()},
+        'ensemble_unbiased_full': {k: round(v, 6) for k, v in
+                                   weighted_metrics(library, weights, 'unbiased').items()},
+        'members': [(round(w, 4), k) for w, k in keep],
+        'weights': weights,
+        'library': library,
+        'trials': trials,
+        'wall_clock_s': round(time.time() - t0, 1),
+    }
+    out['gain_over_best_single'] = round(out['ensemble_valid'] - out['best_single'], 6)
+    out['delta_vs_fm'] = round(out['ensemble_valid'] - FM_VALID_PRIMARY, 6)
+    return out
+
+
+def summarise(out):
+    lines = [
+        'searched %d models in %.0f min' % (out['n_models'], out['wall_clock_s'] / 60),
+        'best single      %.4f' % out['best_single'],
+        'mean single      %.4f' % out['mean_single'],
+        'ENSEMBLE valid   %.4f   (%+.4f vs best single, %+.4f vs FM baseline)'
+        % (out['ensemble_valid'], out['gain_over_best_single'], out['delta_vs_fm']),
+        '   GAUC %.4f (%+.4f vs FM)   nDCG@5 %.4f (%+.4f vs FM)'
+        % (out['ensemble_valid_full']['GAUC'],
+           out['ensemble_valid_full']['GAUC'] - 0.6674,
+           out['ensemble_valid_full']['nDCG@5'],
+           out['ensemble_valid_full']['nDCG@5'] - 0.5357),
+        'ensemble unbiased %.4f  (independent check -- should move the same way)'
+        % out['ensemble_unbiased'],
+        'members (weight, model):',
+    ]
+    for w, k in out['members'][:14]:
+        lines.append('   %.3f  %s' % (w, k))
+    lines.append('noise floor is ~%.4f; treat smaller differences as ties.'
+                 % OBSERVED_NOISE_SD)
+    return '\n'.join(lines)

@@ -1,0 +1,52 @@
+
+=== iter tune 1/14  fm_dropout/softmax k=28 p=0.34838269257012866 lr=0.0011224191519047465 l2=1.2632705943796855e-05 batch=8192 group_size=4
+    BO over the regularisation family: regularisation is the only lever that has produced a real gain, so map that surface properly.
+    seeds=[0, 1]  budget=600s/seed  FM baseline=0.6016
+  s0 e01  loss   1.2596   GAUC 0.6685  nDCG@5 0.5355  valid 0.6020  +0.0004     9s
+  s0 e02  loss   1.1705   GAUC 0.6687  nDCG@5 0.5364  valid 0.6025  +0.0009     9s
+  s0 e03  loss   1.1508   GAUC 0.6689  nDCG@5 0.5369  valid 0.6029  +0.0013    11s
+  s0 e04  loss   1.1303   GAUC 0.6681  nDCG@5 0.5360  valid 0.6020  +0.0004    12s
+  s0 e05  loss   1.1067   GAUC 0.6675  nDCG@5 0.5354  valid 0.6014  -0.0002    11s
+  s0 e06  loss   1.0818   GAUC 0.6638  nDCG@5 0.5341  valid 0.5990  -0.0026    11s
+  s0 e07  loss   1.0599   GAUC 0.6623  nDCG@5 0.5333  valid 0.5978  -0.0038    11s
+  s0 done: best 0.6029 @ep3  (7 epochs)
+  s1 e01  loss   1.2593   GAUC 0.6672  nDCG@5 0.5354  valid 0.6013  -0.0003    11s
+  s1 e02  loss   1.1715   GAUC 0.6700  nDCG@5 0.5366  valid 0.6033  +0.0017    12s
+  s1 e03  loss   1.1551   GAUC 0.6699  nDCG@5 0.5370  valid 0.6035  +0.0019    12s
+  s1 e04  loss   1.1364   GAUC 0.6680  nDCG@5 0.5358  valid 0.6019  +0.0003    12s
+  s1 e05  loss   1.1173   GAUC 0.6672  nDCG@5 0.5362  valid 0.6017  +0.0001    12s
+  s1 e06  loss   1.0938   GAUC 0.6647  nDCG@5 0.5344  valid 0.5996  -0.0020    12s
+  s1 e07  loss   1.0711   GAUC 0.6632  nDCG@5 0.5337  valid 0.5984  -0.0032    12s
+  s1 done: best 0.6035 @ep3  (7 epochs)
+
+=== iter tune 2/14  fm_dropout/softmax k=30 p=0.533649676671949 lr=0.002368720680555266 l2=0.0006412855239072046 batch=8192 group_size=11
+    BO over the regularisation family: regularisation is the only lever that has produced a real gain, so map that surface properly.
+    seeds=[0, 1]  budget=600s/seed  FM baseline=0.6016
+  s0 e01  loss   2.2220   GAUC 0.6652  nDCG@5 0.5346  valid 0.5999  -0.0017    37s
+  s0 e02  loss   2.1627   GAUC 0.6629  nDCG@5 0.5339  valid 0.5984  -0.0032    36s
+  s0 e03  loss   2.1570   GAUC 0.6654  nDCG@5 0.5346  valid 0.6000  -0.0016    36s
+  s0 e04  loss   2.1547   GAUC 0.6647  nDCG@5 0.5349  valid 0.5998  -0.0018    37s
+  s0 e05  loss   2.1524   GAUC 0.6647  nDCG@5 0.5345  valid 0.5996  -0.0020    38s
+  s0 e06  loss   2.1502   GAUC 0.6670  nDCG@5 0.5356  valid 0.6013  -0.0003    40s
+  s0 e07  loss   2.1500   GAUC 0.6661  nDCG@5 0.5347  valid 0.6004  -0.0012    44s
+  s0 e08  loss   2.1470   GAUC 0.6668  nDCG@5 0.5353  valid 0.6011  -0.0005    46s
+  s0 e09  loss   2.1468   GAUC 0.6657  nDCG@5 0.5350  valid 0.6004  -0.0012    40s
+  s0 e10  loss   2.1458   GAUC 0.6647  nDCG@5 0.5347  valid 0.5997  -0.0019    40s
+  s0 done: best 0.6013 @ep6  (10 epochs)
+  s1 e01  loss   2.2210   GAUC 0.6647  nDCG@5 0.5352  valid 0.5999  -0.0017    40s
+  s1 e02  loss   2.1611   GAUC 0.6653  nDCG@5 0.5348  valid 0.6001  -0.0015    40s
+  s1 e03  loss   2.1560   GAUC 0.6650  nDCG@5 0.5350  valid 0.6000  -0.0016    40s
+  s1 e04  loss   2.1537   GAUC 0.6665  nDCG@5 0.5349  valid 0.6007  -0.0009    40s
+  s1 e05  loss   2.1509   GAUC 0.6656  nDCG@5 0.5352  valid 0.6004  -0.0012    40s
+  s1 e06  loss   2.1498   GAUC 0.6658  nDCG@5 0.5343  valid 0.6001  -0.0015    40s
+  s1 e07  loss   2.1472   GAUC 0.6660  nDCG@5 0.5353  valid 0.6007  -0.0009    41s
+  s1 e08  loss   2.1459   GAUC 0.6661  nDCG@5 0.5358  valid 0.6010  -0.0006    40s
+  s1 e09  loss   2.1446   GAUC 0.6662  nDCG@5 0.5351  valid 0.6006  -0.0010    41s
+  s1 e10  loss   2.1429   GAUC 0.6662  nDCG@5 0.5356  valid 0.6009  -0.0007    43s
+  s1 e11  loss   2.1425   GAUC 0.6644  nDCG@5 0.5347  valid 0.5995  -0.0021    42s
+  s1 e12  loss   2.1409   GAUC 0.6657  nDCG@5 0.5352  valid 0.6005  -0.0011    54s
+  s1 done: best 0.6010 @ep8  (12 epochs)
+
+=== iter tune 3/14  fm_dropout/softmax k=26 p=0.20150617509358146 lr=0.001821999398807331 l2=0.001330130822937678 batch=8192 group_size=4
+    BO over the regularisation family: regularisation is the only lever that has produced a real gain, so map that surface properly.
+    seeds=[0, 1]  budget=600s/seed  FM baseline=0.6016

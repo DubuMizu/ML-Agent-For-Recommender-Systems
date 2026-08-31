@@ -1,0 +1,211 @@
+"""Generate the final submission from the configuration the agent designates.
+
+This is the one place the hidden test split is touched, and it is touched only
+to *score* rows -- never to select a model, tune a knob, or early-stop. The
+config comes from the journal's best validation result; training and model
+selection happen exactly as they did during development.
+
+  python submit_final.py --list                 # show journal candidates
+  python submit_final.py --best                 # use the best journal entry
+  python submit_final.py --iteration 7          # use a specific iteration
+  python submit_final.py --best --score-valid   # sanity-score on validation
+  python submit_final.py --ensemble-json runs/ensemble_search.json
+                                                # submit the selected portfolio
+
+Ensembling over seeds is on by default: the harness already trains N seeds, and
+averaging their scores costs nothing extra and reduces seed variance, which is
+the same order as the gains being chased.
+"""
+import argparse
+import json
+import os
+
+import numpy as np
+
+from agent_kit import dataset as D
+from agent_kit.harness import prepare, train_once, predict
+from agent_kit.journal import Journal, FM_TEST_PRIMARY, FM_VALID_PRIMARY
+from agent_kit.metrics import fast_evaluate
+
+
+def rank_average(score_lists):
+    """Average per-seed scores by rank, not raw value.
+
+    Different seeds put logits on different scales; the metric only reads
+    ordering, so averaging ranks is the scale-free way to combine them.
+    """
+    acc = np.zeros(len(score_lists[0]), dtype=np.float64)
+    for s in score_lists:
+        order = np.argsort(np.argsort(s))
+        acc += order / max(1, len(order) - 1)
+    return acc / len(score_lists)
+
+
+def build(cfg, seeds, split, ensemble=True):
+    prep = prepare(cfg.get('features'))
+    per_seed, val_scores = [], []
+    for s in seeds:
+        r = train_once(cfg, prep, s)
+        per_seed.append(predict(r['model'], prep.T[split]))
+        val_scores.append(predict(r['model'], prep.T['valid']))
+        print('  seed %d: best epoch %d, valid primary %.4f'
+              % (s, r['best_epoch'], r['valid']['primary']))
+    if ensemble and len(per_seed) > 1:
+        return rank_average(per_seed), rank_average(val_scores)
+    return per_seed[0], val_scores[0]
+
+
+def build_from_ensemble(path, split):
+    """Retrain the selected portfolio and combine it exactly as it was selected.
+
+    The ensemble that won on validation was a WEIGHTED AVERAGE OF WITHIN-USER
+    RANKS, not of raw scores -- different members put logits on different scales
+    and the metric only reads per-user ordering. Combining raw scores here would
+    submit a different model from the one that was measured, which is the kind of
+    mismatch that shows up only as an unexplained drop on the hidden test.
+
+    Members are retrained from their stored config and seed: the trained weights
+    themselves only ever lived in the search process's memory.
+    """
+    from agent_kit.ensemble_search import within_user_rank
+    from agent_kit.metrics import group_offsets
+
+    with open(path, encoding='utf-8') as fh:
+        spec = json.load(fh)
+    members = spec.get('member_configs') or []
+    if not members:
+        raise SystemExit('%s has no member_configs; run ensemble_search first' % path)
+
+    total = sum(float(m['weight']) for m in members)
+    prep = prepare()
+    ctx = {}
+    for s in ('valid', split):
+        u = prep.users[s]
+        starts = group_offsets(np.sort(u))
+        ctx[s] = (u, starts, np.diff(starts))
+
+    acc = {s: np.zeros(len(prep.users[s]), dtype=np.float64) for s in ctx}
+    print('retraining %d ensemble members (validation ensemble was %.4f)'
+          % (len(members), spec.get('ensemble_valid', float('nan'))))
+    for i, m in enumerate(members, 1):
+        w = float(m['weight']) / total
+        # The seed is part of the member's identity: two library entries can
+        # share a config and differ only by seed, and retraining both at seed 0
+        # would collapse them into one model and change the ensemble. Older
+        # files carry it only inside the key ("fm_softmax#3:s1").
+        seed = m.get('seed')
+        if seed is None:
+            tail = str(m.get('key', '')).rsplit(':s', 1)
+            seed = int(tail[-1]) if len(tail) == 2 and tail[-1].isdigit() else 0
+        seed = int(seed)
+        r = train_once(m['config'], prep, seed)
+        for s in ctx:
+            ranks = within_user_rank(predict(r['model'], prep.T[s]).astype(np.float64),
+                                     *ctx[s])
+            acc[s] += w * ranks
+        print('  %2d/%d  %-22s seed %d  w=%.3f  best epoch %d  valid %.4f'
+              % (i, len(members), m.get('key', '?'), seed, w, r['best_epoch'],
+                 r['valid']['primary']))
+    return acc[split], acc['valid'], spec
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--data_dir', default='./KuaiRand-Pure/data')
+    ap.add_argument('--out', default='submission.csv')
+    ap.add_argument('--split', default='test', choices=['valid', 'test'])
+    ap.add_argument('--seeds', type=int, default=5)
+    ap.add_argument('--no-ensemble', action='store_true')
+    ap.add_argument('--score-valid', action='store_true',
+                    help='report the validation score of the submitted model')
+    ap.add_argument('--score-test', action='store_true',
+                    help='ALSO score the hidden split locally (final report only)')
+    g = ap.add_mutually_exclusive_group(required=True)
+    g.add_argument('--best', action='store_true')
+    g.add_argument('--iteration', type=int)
+    g.add_argument('--list', action='store_true')
+    g.add_argument('--ensemble-json',
+                   help='submit the weighted portfolio selected by '
+                        'ensemble_search (runs/ensemble_search.json)')
+    a = ap.parse_args()
+
+    J = Journal()
+    if a.list:
+        for e in J.entries:
+            if e.get('valid_primary') is not None:
+                print('%4d  valid %.4f (%+.4f)  %s'
+                      % (e['iteration'], e['valid_primary'], e['delta_vs_fm'],
+                         json.dumps(e['config'])))
+        return
+
+    if a.ensemble_json:
+        scores, val_scores, spec = build_from_ensemble(a.ensemble_json, a.split)
+        write_out(a, scores, val_scores, cfg=None,
+                  label='ensemble of %d members (validation %.4f, %+.4f vs FM)'
+                        % (len(spec.get('member_configs', [])),
+                           spec.get('ensemble_valid', float('nan')),
+                           spec.get('delta_vs_fm', float('nan'))))
+        return
+
+    if a.best:
+        entry = J.best()
+        if entry is None:
+            raise SystemExit('journal has no successful experiment yet')
+    else:
+        matches = [e for e in J.entries if e.get('iteration') == a.iteration]
+        if not matches:
+            raise SystemExit('no journal entry for iteration %d' % a.iteration)
+        entry = matches[0]
+
+    cfg = entry['config']
+    print('final config from iteration %d (valid primary %.4f, %+.4f vs FM):'
+          % (entry['iteration'], entry['valid_primary'], entry['delta_vs_fm']))
+    print(json.dumps(cfg, indent=2))
+    print('training %d seeds%s ...' % (a.seeds, '' if a.no_ensemble else ', rank-averaged'))
+
+    seeds = tuple(range(a.seeds))
+    scores, val_scores = build(cfg, seeds, a.split, ensemble=not a.no_ensemble)
+    write_out(a, scores, val_scores, cfg=cfg,
+              label='iteration %d' % entry['iteration'])
+
+
+def write_out(a, scores, val_scores, cfg=None, label=''):
+    """Write, verify and (optionally) score one submission.
+
+    Shared by the single-model and ensemble paths on purpose: the format check
+    against the official loader is the only thing standing between a good model
+    and a silently misaligned file, and a second copy of it would drift.
+    """
+    # write in the official schema, using the official loader for row order
+    from submit import write_submission, read_submission
+    splits = D.load_frames()
+    fr = splits[a.split]
+    rows = [(None, str(int(u)), str(int(v))) for u, v in
+            zip(fr['user_id'], fr['video_id'])]
+    write_submission(a.out, rows, scores)
+    print('wrote %s (%d rows) from %s' % (a.out, len(rows), label))
+
+    # validate with the official reader against the official loader's rows
+    from data import load as official_load
+    official_rows = official_load(a.data_dir)[a.split]
+    got = read_submission(a.out, official_rows)
+    print('official format + alignment check: PASSED (%d rows)' % len(got))
+
+    if a.score_valid:
+        prep = prepare((cfg or {}).get('features'))
+        r = fast_evaluate(prep.users['valid'], prep.y['valid'], val_scores)
+        print('validation (as submitted): GAUC %.4f | nDCG@5 %.4f | primary %.4f  (FM %.4f)'
+              % (r['GAUC'], r['nDCG@5'], r['primary'], FM_VALID_PRIMARY))
+
+    if a.score_test and a.split == 'test':
+        y = np.array([x[6] for x in official_rows], dtype=np.float32)
+        u = np.array([int(x[1]) for x in official_rows], dtype=np.int64)
+        r = fast_evaluate(u, y, got)
+        print('HIDDEN TEST: GAUC %.4f | nDCG@5 %.4f | primary %.4f'
+              % (r['GAUC'], r['nDCG@5'], r['primary']))
+        print('             FM baseline %.4f -> delta %+.4f'
+              % (FM_TEST_PRIMARY, r['primary'] - FM_TEST_PRIMARY))
+
+
+if __name__ == '__main__':
+    main()

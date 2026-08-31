@@ -1,0 +1,28 @@
+
+[iter 15] REDO iter12: FM+softmax, dropout p=0.3 l2=1e-4, fair per-seed budget.
+   valid primary 0.6035 +-0.0001 (GAUC 0.6702, nDCG@5 0.5368) | unbiased 0.3705 | best epochs [4, 2, 4] | 532s
+   epochs_run=[8, 6, 8] secs/epoch=[28.7, 21.7, 20.8] timed_out=[False, False, False]
+   seed0 curve: [0.6017, 0.6033, 0.6032, 0.6035, 0.6017, 0.6006, 0.6004, 0.5989]
+   seed1 curve: [0.6029, 0.6034, 0.6032, 0.6028, 0.6027, 0.6024]
+   seed2 curve: [0.602, 0.6034, 0.6029, 0.6036, 0.6027, 0.6017, 0.6016, 0.6014]
+
+[iter 16] REDO iter13: same but p=0.5 -- seed1 reached epoch 10 still improving when the clock died.
+   valid primary 0.6037 +-0.0001 (GAUC 0.6704, nDCG@5 0.5370) | unbiased 0.3705 | best epochs [5, 9, 4] | 585s
+   epochs_run=[9, 13, 8] secs/epoch=[19.4, 19.5, 19.4] timed_out=[False, False, False]
+   seed0 curve: [0.6, 0.6021, 0.6023, 0.6034, 0.6035, 0.6029, 0.6031, 0.6032, 0.6034]
+   seed1 curve: [0.6003, 0.6024, 0.603, 0.6027, 0.6028, 0.6032, 0.6035, 0.6035, 0.6038, 0.6032, 0.6031, 0.6034, 0.6035]
+   seed2 curve: [0.6, 0.6022, 0.6029, 0.6038, 0.6026, 0.6028, 0.6031, 0.6031]
+
+[iter 17] REDO iter14: DIN head under iteration 12's regularisation recipe.
+   valid primary 0.6036 +-0.0003 (GAUC 0.6704, nDCG@5 0.5368) | unbiased 0.3723 | best epochs [4, 1, 2] | 929s
+   epochs_run=[8, 5, 6] secs/epoch=[48.4, 48.9, 49.1] timed_out=[False, False, False]
+   seed0 curve: [0.6015, 0.6031, 0.6029, 0.6039, 0.6019, 0.6008, 0.601, 0.5998]
+   seed1 curve: [0.6032, 0.6032, 0.6032, 0.603, 0.6024]
+   seed2 curve: [0.6015, 0.6037, 0.6035, 0.6033, 0.6032, 0.6023]
+Traceback (most recent call last):
+  File "C:\Users\asus\Desktop\Hackathon\Tiktok\rerun_budget.py", line 39, in <module>
+    print("\n" + J.digest())
+  File "C:\Users\asus\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 1179-1180: character maps to <undefined>

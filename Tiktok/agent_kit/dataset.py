@@ -1,0 +1,320 @@
+"""Cached, order-verified superset loader for KuaiRand-Pure.
+
+`data.py` (official, do not modify) drops every column except the five baseline
+fields. This module replicates its row ordering exactly -- concatenate
+log_standard_4_08_to_4_21 then log_standard_4_22_to_5_08, then filter by date
+preserving file order -- while retaining the auxiliary labels, timestamps and
+raw fields that later experiments (multi-task heads, behaviour sequences, time
+features) need.
+
+Row-for-row agreement with the official loader is asserted by
+`verify_against_official()`; nothing downstream is trusted until that passes.
+Frames are cached to .npz so each agent iteration pays training cost only.
+"""
+import os
+import numpy as np
+import pandas as pd
+
+DATA_DIR = os.environ.get('KUAIRAND_DIR', './KuaiRand-Pure/data')
+CACHE_DIR = os.environ.get('KUAIRAND_CACHE', './.cache')
+CACHE_VERSION = 'v1'
+
+LOG_FILES = ('log_standard_4_08_to_4_21_pure.csv',
+             'log_standard_4_22_to_5_08_pure.csv')
+RANDOM_LOG = 'log_random_4_22_to_5_08_pure.csv'
+
+SPLITS = {'train': (20220408, 20220421),
+          'valid': (20220422, 20220428),
+          'test':  (20220429, 20220508)}
+
+LABEL = 'long_view'
+AUX_LABELS = ['is_click', 'is_like', 'is_follow', 'is_comment', 'is_forward', 'is_hate']
+BASE_FIELDS = ['user_id', 'video_id', 'author_id', 'tab', 'dur_bucket']
+
+_LOG_COLS = ['user_id', 'video_id', 'date', 'hourmin', 'time_ms', LABEL,
+             'play_time_ms', 'duration_ms', 'tab'] + AUX_LABELS
+
+_INT_COLS = ['user_id', 'video_id', 'author_id', 'tab', 'date', 'hourmin']
+_F32_COLS = ['duration_ms', 'play_time_ms']
+
+
+def _video_author_map(data_dir):
+    """video_id -> author_id, mirroring the dict lookup in data.py."""
+    vf = pd.read_csv(os.path.join(data_dir, 'video_features_basic_pure.csv'),
+                     usecols=['video_id', 'author_id'])
+    return dict(zip(vf['video_id'].to_numpy(), vf['author_id'].to_numpy()))
+
+
+def _read_logs(data_dir, files):
+    """Concatenate log files in official order and attach author_id."""
+    parts = [pd.read_csv(os.path.join(data_dir, f), usecols=_LOG_COLS) for f in files]
+    df = pd.concat(parts, ignore_index=True)          # order == official order
+    v2a = _video_author_map(data_dir)
+    # .map preserves row order (a merge need not); missing author -> -1, i.e. UNK
+    df['author_id'] = df['video_id'].map(v2a).fillna(-1).astype(np.int64)
+    return df
+
+
+def _frame_from_df(df):
+    """DataFrame -> dict of contiguous numpy arrays."""
+    fr = {}
+    for c in _INT_COLS:
+        fr[c] = np.ascontiguousarray(df[c].to_numpy(dtype=np.int64))
+    for c in _F32_COLS:
+        fr[c] = np.ascontiguousarray(df[c].to_numpy(dtype=np.float32))
+    fr['time_ms'] = np.ascontiguousarray(df['time_ms'].to_numpy(dtype=np.float64))
+    # official label semantics: long_view != 0 -> 1
+    fr['y'] = (df[LABEL].to_numpy() != 0).astype(np.float32)
+    for c in AUX_LABELS:
+        fr[c] = (df[c].to_numpy() != 0).astype(np.float32)
+    return fr
+
+
+def _cache_path(tag):
+    return os.path.join(CACHE_DIR, tag + '_' + CACHE_VERSION + '.npz')
+
+
+# --------------------------------------------------------- access control ---
+# Model code runs inside a lock. While it is held, the full-splits accessor
+# raises and only the train-only accessor works, so a model physically cannot
+# read validation or test labels -- not by convention, but because the call
+# fails. This matters because models are the one part of the system the agent
+# writes freely: a model that peeked at frames['valid']['y'] would score
+# beautifully and be completely worthless, and nothing else in the pipeline
+# would notice.
+_LOCK = {'held': False, 'reason': ''}
+
+
+def lock_eval_access(reason='model code is running'):
+    _LOCK['held'] = True
+    _LOCK['reason'] = reason
+
+
+def unlock_eval_access():
+    _LOCK['held'] = False
+    _LOCK['reason'] = ''
+
+
+def eval_access_locked():
+    return _LOCK['held']
+
+
+class EvalAccessError(RuntimeError):
+    """Raised when model code tries to reach held-out data."""
+
+
+def load_frames(data_dir=DATA_DIR, use_cache=True):
+    """{'train'|'valid'|'test': {col: ndarray}} in exact official row order.
+
+    Refuses to run while the eval-access lock is held; model code must call
+    load_train_frame() instead.
+    """
+    if _LOCK['held']:
+        raise EvalAccessError(
+            'load_frames() returns validation and test rows and is locked while %s. '
+            'Model code must use dataset.load_train_frame(), which can only ever '
+            'return the training split. If you need held-out data you are writing '
+            'a leak, not a feature.' % _LOCK['reason'])
+    return _load_frames_unchecked(data_dir, use_cache)
+
+
+def load_train_frame(data_dir=DATA_DIR, use_cache=True):
+    """The training split only -- the accessor model code is meant to use.
+
+    Always available, lock or no lock, because it cannot expose held-out data.
+    """
+    return _load_frames_unchecked(data_dir, use_cache)['train']
+
+
+def _load_frames_unchecked(data_dir=DATA_DIR, use_cache=True):
+    path = _cache_path('frames')
+    if use_cache and os.path.exists(path):
+        z = np.load(path)
+        out = {s: {} for s in SPLITS}
+        for key in z.files:
+            split, col = key.split('__', 1)
+            out[split][col] = z[key]
+        return out
+
+    df = _read_logs(data_dir, LOG_FILES)
+    date = df['date'].to_numpy()
+    out = {}
+    for name, (lo, hi) in SPLITS.items():
+        sel = (date >= lo) & (date <= hi)             # boolean mask preserves order
+        out[name] = _frame_from_df(df.loc[sel])
+
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    np.savez(path, **{s + '__' + c: a for s, fr in out.items() for c, a in fr.items()})
+    return out
+
+
+def load_random_frame(data_dir=DATA_DIR, window=SPLITS['valid'], use_cache=True):
+    """Randomised-exposure log, for the unbiased overfit check.
+
+    Exposure here is not chosen by the logging policy, so a gain that appears on
+    biased validation but not here is a gain against the policy, not the user.
+    """
+    tag = 'random_%d_%d' % (window[0], window[1])
+    path = _cache_path(tag)
+    if use_cache and os.path.exists(path):
+        z = np.load(path)
+        return {k: z[k] for k in z.files}
+
+    df = _read_logs(data_dir, (RANDOM_LOG,))
+    date = df['date'].to_numpy()
+    fr = _frame_from_df(df.loc[(date >= window[0]) & (date <= window[1])])
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    np.savez(path, **fr)
+    return fr
+
+
+def verify_against_official(data_dir=DATA_DIR, frames=None):
+    """Assert row-for-row equality with data.load(). Returns a report dict."""
+    from data import load as official_load
+    frames = frames if frames is not None else _load_frames_unchecked(data_dir)
+    official = official_load(data_dir)
+    report = {}
+    for name in SPLITS:
+        rows = official[name]
+        fr = frames[name]
+        assert len(rows) == len(fr['y']), '%s: %d vs %d rows' % (name, len(rows), len(fr['y']))
+        ou = np.array([int(x[1]) for x in rows], dtype=np.int64)
+        ov = np.array([int(x[2]) for x in rows], dtype=np.int64)
+        oy = np.array([x[6] for x in rows], dtype=np.float32)
+        oa = np.array([-1 if x[3] == 'UNK' else int(x[3]) for x in rows], dtype=np.int64)
+        ot = np.array([int(x[4]) for x in rows], dtype=np.int64)
+        od = np.array([x[5] for x in rows], dtype=np.float32)
+        assert np.array_equal(ou, fr['user_id']),     name + ': user_id order differs'
+        assert np.array_equal(ov, fr['video_id']),    name + ': video_id order differs'
+        assert np.array_equal(oa, fr['author_id']),   name + ': author_id differs'
+        assert np.array_equal(ot, fr['tab']),         name + ': tab differs'
+        assert np.array_equal(oy, fr['y']),           name + ': label differs'
+        assert np.array_equal(od, fr['duration_ms']), name + ': duration_ms differs'
+        report[name] = {'rows': len(rows), 'pos_rate': float(fr['y'].mean())}
+    return report
+
+
+# ---------------------------------------------------------------- encoding ---
+def bucket_edges(durations, n=10):
+    """Identical to _bucket_edges in data.py (train-fitted duration quantiles)."""
+    return np.quantile(np.asarray(durations), np.linspace(0, 1, n + 1)[1:-1])
+
+
+class BaseEncoder:
+    """The 5 baseline fields, plus any crossed fields the config asks for.
+
+    Fitted on train only. Values unseen at fit time fall into each field's UNK
+    slot, so held-out splits and the randomised-exposure log can be transformed
+    with the same vocabulary.
+
+    Two things are configurable through the experiment's `features` block, both
+    because measurement said they mattered and neither was reachable before:
+
+      * `dur_buckets` (default 10, the baseline value) -- long_view is defined
+        against duration, and the duration signal alone ranks at GAUC 0.5319 at
+        10 buckets versus 0.5582 at 200, so the default discretisation is
+        throwing information away.
+      * `crosses` -- explicit conjunctions like ["video_id", "tab"]. FM already
+        crosses fields at order 2 through their embeddings, but a 16-dim
+        embedding cross is far less sample-efficient than one id for a video
+        seen a handful of times: a video x tab rate ranks at 0.6479 alone
+        against 0.6387 for a plain video rate.
+
+    Crossed fields are APPENDED, never inserted. Several models index X[:, 0]
+    and X[:, 1] directly for the user and video embeddings, and the aux-prior
+    model derives its video offset from the width of field 0, so the first five
+    positions and their offsets have to stay exactly where they are.
+    """
+
+    def __init__(self, vocab_luts, dims, offsets, edges, crosses=()):
+        self._luts = vocab_luts             # (lut, lo, hi, unk) per field
+        self.dims = dims
+        self.offsets = offsets
+        self.edges = edges
+        self.crosses = list(crosses)        # (idx_a, idx_b, multiplier)
+        self.total_dim = int(sum(dims))
+        self.fields = list(BASE_FIELDS) + [
+            '%s_x_%s' % (BASE_FIELDS[ia], BASE_FIELDS[ib]) for ia, ib, _ in self.crosses]
+
+    def base_raw(self, fr):
+        dur_bucket = np.searchsorted(self.edges, fr['duration_ms']).astype(np.int64)
+        return [fr['user_id'], fr['video_id'], fr['author_id'], fr['tab'], dur_bucket]
+
+    def raw_fields(self, fr):
+        cols = self.base_raw(fr)
+        for ia, ib, mult in self.crosses:
+            b = cols[ib]
+            # A value of the second column beyond what train contained would
+            # collide with a DIFFERENT legitimate pair under a*mult+b. Emitting
+            # -1 puts it below every lut's `lo`, so it lands in UNK instead of
+            # silently impersonating another combination.
+            cols.append(np.where(b < mult, cols[ia] * mult + b, -1))
+        return cols
+
+    def transform(self, fr):
+        cols = self.raw_fields(fr)
+        X = np.empty((len(fr['y']), len(cols)), dtype=np.int32)
+        for i, col in enumerate(cols):
+            lut, lo, hi, unk = self._luts[i]
+            mapped = np.where((col >= lo) & (col <= hi),
+                              lut[np.clip(col, lo, hi) - lo], unk)
+            X[:, i] = (mapped + self.offsets[i]).astype(np.int32)
+        return X
+
+
+CROSSABLE = {name: i for i, name in enumerate(BASE_FIELDS)}
+
+
+def _parse_crosses(spec, train_frame, edges):
+    """['video_id','tab'] or [['video_id','tab'], ...] -> [(ia, ib, mult)]."""
+    if not spec:
+        return []
+    if spec and isinstance(spec[0], str):
+        spec = [spec]
+    probe = BaseEncoder([], [], [], edges)
+    base = probe.base_raw(train_frame)
+    out = []
+    for pair in spec:
+        if len(pair) != 2:
+            raise ValueError('a cross must name exactly two fields, got %r' % (pair,))
+        for nm in pair:
+            if nm not in CROSSABLE:
+                raise ValueError('unknown field %r; crossable fields are %s'
+                                 % (nm, sorted(CROSSABLE)))
+        ia, ib = CROSSABLE[pair[0]], CROSSABLE[pair[1]]
+        out.append((ia, ib, int(base[ib].max()) + 1))
+    return out
+
+
+def fit_base_encoder(train_frame, feat_cfg=None):
+    """Fit the encoder on the train split (first-appearance vocab order).
+
+    feat_cfg: {'dur_buckets': int, 'crosses': [['video_id','tab'], ...]}
+    Defaults reproduce the official baseline encoding exactly.
+    """
+    feat_cfg = feat_cfg or {}
+    edges = bucket_edges(train_frame['duration_ms'],
+                         n=int(feat_cfg.get('dur_buckets', 10)))
+    crosses = _parse_crosses(feat_cfg.get('crosses'), train_frame, edges)
+    enc = BaseEncoder([], [], [], edges, crosses)
+    luts, dims = [], []
+    for col in enc.raw_fields(train_frame):
+        # first-appearance order, matching the sequential dict build in data.py
+        _, first_idx = np.unique(col, return_index=True)
+        order = col[np.sort(first_idx)]
+        unk = len(order)
+        lo, hi = int(order.min()), int(order.max())
+        lut = np.full(hi - lo + 1, unk, dtype=np.int64)
+        lut[order - lo] = np.arange(len(order), dtype=np.int64)
+        luts.append((lut, lo, hi, unk))
+        dims.append(unk + 1)                          # +1 UNK slot
+    offsets = np.cumsum([0] + dims[:-1]).astype(np.int64)
+    return BaseEncoder(luts, dims, offsets, edges, crosses)
+
+
+def encode_base(frames):
+    """Back-compat wrapper: (X per split, total_dim, meta)."""
+    enc = fit_base_encoder(frames['train'])
+    X = {name: enc.transform(fr) for name, fr in frames.items()}
+    return X, enc.total_dim, {'dims': enc.dims, 'offsets': enc.offsets.tolist(),
+                              'edges': enc.edges, 'encoder': enc}

@@ -1,0 +1,411 @@
+
+### family fm_softmax
+
+=== iter fm_softmax 1/4  fm_dropout/softmax k=16 p=0.3348933568819351 lr=0.001157837261608609 l2=1.2424568294055708e-05 batch=8192 group_size=4
+    [fm_softmax] init
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.2734   GAUC 0.6678  nDCG@5 0.5351  valid 0.6015  -0.0001    10s
+  s0 e02  loss   1.1806   GAUC 0.6685  nDCG@5 0.5363  valid 0.6024  +0.0008    11s
+  s0 e03  loss   1.1644   GAUC 0.6691  nDCG@5 0.5366  valid 0.6029  +0.0013    12s
+  s0 e04  loss   1.1517   GAUC 0.6699  nDCG@5 0.5373  valid 0.6036  +0.0020    12s
+  s0 e05  loss   1.1377   GAUC 0.6692  nDCG@5 0.5361  valid 0.6027  +0.0011    13s
+  s0 e06  loss   1.1225   GAUC 0.6667  nDCG@5 0.5354  valid 0.6011  -0.0005    13s
+  s0 e07  loss   1.1080   GAUC 0.6655  nDCG@5 0.5351  valid 0.6003  -0.0013    12s
+  s0 e08  loss   1.0928   GAUC 0.6637  nDCG@5 0.5341  valid 0.5989  -0.0027    13s
+  s0 done: best 0.6036 @ep4  (8 epochs)
+  s1 e01  loss   1.2756   GAUC 0.6665  nDCG@5 0.5350  valid 0.6007  -0.0009    12s
+  s1 e02  loss   1.1808   GAUC 0.6707  nDCG@5 0.5367  valid 0.6037  +0.0021    12s
+  s1 e03  loss   1.1639   GAUC 0.6702  nDCG@5 0.5372  valid 0.6037  +0.0021    12s
+  s1 e04  loss   1.1486   GAUC 0.6691  nDCG@5 0.5365  valid 0.6028  +0.0012    11s
+  s1 e05  loss   1.1348   GAUC 0.6690  nDCG@5 0.5368  valid 0.6029  +0.0013    12s
+  s1 e06  loss   1.1189   GAUC 0.6670  nDCG@5 0.5355  valid 0.6013  -0.0003    12s
+  s1 done: best 0.6037 @ep2  (6 epochs)
+
+=== iter fm_softmax 2/4  fm_dropout/softmax k=16 p=0.6563777886388609 lr=0.0016826575674295122 l2=0.00024882104888408264 batch=8192 group_size=10
+    [fm_softmax] init
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   2.1693   GAUC 0.6672  nDCG@5 0.5352  valid 0.6012  -0.0004    32s
+  s0 e02  loss   2.0837   GAUC 0.6671  nDCG@5 0.5353  valid 0.6012  -0.0004    30s
+  s0 e03  loss   2.0707   GAUC 0.6675  nDCG@5 0.5356  valid 0.6016  -0.0000    27s
+  s0 e04  loss   2.0663   GAUC 0.6683  nDCG@5 0.5359  valid 0.6021  +0.0005    30s
+  s0 e05  loss   2.0614   GAUC 0.6682  nDCG@5 0.5355  valid 0.6018  +0.0002    29s
+  s0 e06  loss   2.0587   GAUC 0.6683  nDCG@5 0.5361  valid 0.6022  +0.0006    24s
+  s0 e07  loss   2.0548   GAUC 0.6681  nDCG@5 0.5353  valid 0.6017  +0.0001    24s
+  s0 e08  loss   2.0542   GAUC 0.6692  nDCG@5 0.5361  valid 0.6027  +0.0011    24s
+  s0 e09  loss   2.0518   GAUC 0.6689  nDCG@5 0.5366  valid 0.6028  +0.0012    24s
+  s0 e10  loss   2.0504   GAUC 0.6684  nDCG@5 0.5361  valid 0.6022  +0.0006    25s
+  s0 e11  loss   2.0484   GAUC 0.6678  nDCG@5 0.5359  valid 0.6018  +0.0002    25s
+  s0 e12  loss   2.0478   GAUC 0.6687  nDCG@5 0.5359  valid 0.6023  +0.0007    24s
+  s0 e13  loss   2.0466   GAUC 0.6685  nDCG@5 0.5356  valid 0.6020  +0.0004    25s
+  s0 done: best 0.6028 @ep9  (13 epochs)
+  s1 e01  loss   2.1699   GAUC 0.6660  nDCG@5 0.5345  valid 0.6002  -0.0014    25s
+  s1 e02  loss   2.0847   GAUC 0.6674  nDCG@5 0.5355  valid 0.6015  -0.0001    25s
+  s1 e03  loss   2.0711   GAUC 0.6682  nDCG@5 0.5358  valid 0.6020  +0.0004    25s
+  s1 e04  loss   2.0659   GAUC 0.6690  nDCG@5 0.5361  valid 0.6025  +0.0009    25s
+  s1 e05  loss   2.0620   GAUC 0.6688  nDCG@5 0.5360  valid 0.6024  +0.0008    25s
+  s1 e06  loss   2.0592   GAUC 0.6682  nDCG@5 0.5363  valid 0.6023  +0.0007    25s
+  s1 e07  loss   2.0555   GAUC 0.6679  nDCG@5 0.5358  valid 0.6019  +0.0003    25s
+  s1 e08  loss   2.0540   GAUC 0.6681  nDCG@5 0.5362  valid 0.6021  +0.0005    34s
+  s1 done: best 0.6025 @ep4  (8 epochs)
+
+=== iter fm_softmax 3/4  fm_dropout/softmax k=16 p=0.3426306494085986 lr=0.001157504518575783 l2=1.1866209131416951e-05 batch=8192 group_size=4
+    [fm_softmax] bayes
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.2737   GAUC 0.6680  nDCG@5 0.5351  valid 0.6015  -0.0001    16s
+  s0 e02  loss   1.1816   GAUC 0.6686  nDCG@5 0.5363  valid 0.6024  +0.0008    14s
+  s0 e03  loss   1.1654   GAUC 0.6690  nDCG@5 0.5367  valid 0.6028  +0.0012    18s
+  s0 e04  loss   1.1529   GAUC 0.6700  nDCG@5 0.5371  valid 0.6036  +0.0020    18s
+  s0 e05  loss   1.1388   GAUC 0.6692  nDCG@5 0.5360  valid 0.6026  +0.0010    16s
+  s0 e06  loss   1.1236   GAUC 0.6672  nDCG@5 0.5355  valid 0.6014  -0.0002    13s
+  s0 e07  loss   1.1092   GAUC 0.6659  nDCG@5 0.5354  valid 0.6007  -0.0009    13s
+  s0 e08  loss   1.0938   GAUC 0.6635  nDCG@5 0.5340  valid 0.5988  -0.0029    14s
+  s0 done: best 0.6036 @ep4  (8 epochs)
+  s1 e01  loss   1.2759   GAUC 0.6664  nDCG@5 0.5349  valid 0.6006  -0.0010    17s
+  s1 e02  loss   1.1813   GAUC 0.6705  nDCG@5 0.5368  valid 0.6037  +0.0021    16s
+  s1 e03  loss   1.1643   GAUC 0.6705  nDCG@5 0.5374  valid 0.6039  +0.0023    16s
+  s1 e04  loss   1.1492   GAUC 0.6693  nDCG@5 0.5365  valid 0.6029  +0.0013    15s
+  s1 e05  loss   1.1358   GAUC 0.6690  nDCG@5 0.5367  valid 0.6029  +0.0013    17s
+  s1 e06  loss   1.1202   GAUC 0.6673  nDCG@5 0.5359  valid 0.6016  -0.0000    15s
+  s1 e07  loss   1.1049   GAUC 0.6652  nDCG@5 0.5348  valid 0.6000  -0.0016    15s
+  s1 done: best 0.6039 @ep3  (7 epochs)
+
+=== iter fm_softmax 4/4  fm_dropout/softmax k=16 p=0.3438603327361526 lr=0.0011615255157217794 l2=1.2285706735729048e-05 batch=8192 group_size=4
+    [fm_softmax] bayes
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.2736   GAUC 0.6681  nDCG@5 0.5352  valid 0.6017  +0.0001    17s
+  s0 e02  loss   1.1817   GAUC 0.6685  nDCG@5 0.5362  valid 0.6023  +0.0007    15s
+  s0 e03  loss   1.1657   GAUC 0.6689  nDCG@5 0.5366  valid 0.6028  +0.0012    12s
+  s0 e04  loss   1.1533   GAUC 0.6700  nDCG@5 0.5370  valid 0.6035  +0.0019    12s
+  s0 e05  loss   1.1392   GAUC 0.6689  nDCG@5 0.5359  valid 0.6024  +0.0008    11s
+  s0 e06  loss   1.1241   GAUC 0.6672  nDCG@5 0.5356  valid 0.6014  -0.0002    11s
+  s0 e07  loss   1.1098   GAUC 0.6660  nDCG@5 0.5355  valid 0.6007  -0.0009    11s
+  s0 e08  loss   1.0944   GAUC 0.6636  nDCG@5 0.5342  valid 0.5989  -0.0027    11s
+  s0 done: best 0.6035 @ep4  (8 epochs)
+  s1 e01  loss   1.2758   GAUC 0.6665  nDCG@5 0.5350  valid 0.6007  -0.0009    11s
+  s1 e02  loss   1.1813   GAUC 0.6706  nDCG@5 0.5368  valid 0.6037  +0.0021    11s
+  s1 e03  loss   1.1644   GAUC 0.6704  nDCG@5 0.5373  valid 0.6039  +0.0023    12s
+  s1 e04  loss   1.1492   GAUC 0.6693  nDCG@5 0.5366  valid 0.6029  +0.0013    12s
+  s1 e05  loss   1.1358   GAUC 0.6690  nDCG@5 0.5367  valid 0.6029  +0.0013    12s
+  s1 e06  loss   1.1204   GAUC 0.6677  nDCG@5 0.5360  valid 0.6018  +0.0002    12s
+  s1 e07  loss   1.1052   GAUC 0.6651  nDCG@5 0.5348  valid 0.6000  -0.0016    12s
+  s1 done: best 0.6039 @ep3  (7 epochs)
+
+### family fm_bpr
+
+=== iter fm_bpr 1/4  fm_dropout/bpr k=16 p=0.6015548858355853 lr=0.0005907686661094199 l2=0.0001618088211824494 batch=8192 group_size=8
+    [fm_bpr] init
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   0.6609   GAUC 0.6603  nDCG@5 0.5320  valid 0.5961  -0.0055     8s
+  s0 e02  loss   0.6033   GAUC 0.6651  nDCG@5 0.5338  valid 0.5994  -0.0022     9s
+  s0 e03  loss   0.5880   GAUC 0.6667  nDCG@5 0.5353  valid 0.6010  -0.0006    11s
+  s0 e04  loss   0.5816   GAUC 0.6669  nDCG@5 0.5355  valid 0.6012  -0.0004    10s
+  s0 e05  loss   0.5773   GAUC 0.6674  nDCG@5 0.5357  valid 0.6015  -0.0001     8s
+  s0 e06  loss   0.5758   GAUC 0.6671  nDCG@5 0.5353  valid 0.6012  -0.0004     8s
+  s0 e07  loss   0.5733   GAUC 0.6675  nDCG@5 0.5357  valid 0.6016  -0.0000     8s
+  s0 e08  loss   0.5724   GAUC 0.6679  nDCG@5 0.5358  valid 0.6018  +0.0002     8s
+  s0 e09  loss   0.5716   GAUC 0.6679  nDCG@5 0.5360  valid 0.6019  +0.0003     8s
+  s0 e10  loss   0.5701   GAUC 0.6685  nDCG@5 0.5361  valid 0.6023  +0.0007     7s
+  s0 e11  loss   0.5699   GAUC 0.6673  nDCG@5 0.5353  valid 0.6013  -0.0003     6s
+  s0 e12  loss   0.5692   GAUC 0.6674  nDCG@5 0.5356  valid 0.6015  -0.0001     6s
+  s0 e13  loss   0.5692   GAUC 0.6668  nDCG@5 0.5353  valid 0.6011  -0.0005     6s
+  s0 e14  loss   0.5675   GAUC 0.6677  nDCG@5 0.5358  valid 0.6018  +0.0002     6s
+  s0 done: best 0.6023 @ep10  (14 epochs)
+  s1 e01  loss   0.6611   GAUC 0.6619  nDCG@5 0.5323  valid 0.5971  -0.0045     5s
+  s1 e02  loss   0.6031   GAUC 0.6660  nDCG@5 0.5348  valid 0.6004  -0.0012     5s
+  s1 e03  loss   0.5881   GAUC 0.6673  nDCG@5 0.5354  valid 0.6014  -0.0002     5s
+  s1 e04  loss   0.5813   GAUC 0.6685  nDCG@5 0.5359  valid 0.6022  +0.0006     6s
+  s1 e05  loss   0.5773   GAUC 0.6678  nDCG@5 0.5355  valid 0.6016  +0.0000     7s
+  s1 e06  loss   0.5747   GAUC 0.6673  nDCG@5 0.5355  valid 0.6014  -0.0002     7s
+  s1 e07  loss   0.5738   GAUC 0.6667  nDCG@5 0.5350  valid 0.6009  -0.0007     8s
+  s1 e08  loss   0.5718   GAUC 0.6671  nDCG@5 0.5355  valid 0.6013  -0.0003     7s
+  s1 done: best 0.6022 @ep4  (8 epochs)
+
+=== iter fm_bpr 2/4  fm_dropout/bpr k=16 p=0.2555405800788531 lr=0.001323428607286237 l2=0.00010967849059796656 batch=8192 group_size=8
+    [fm_bpr] init
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   0.6188   GAUC 0.6637  nDCG@5 0.5335  valid 0.5986  -0.0030     7s
+  s0 e02  loss   0.5670   GAUC 0.6656  nDCG@5 0.5341  valid 0.5999  -0.0017     7s
+  s0 e03  loss   0.5640   GAUC 0.6683  nDCG@5 0.5361  valid 0.6022  +0.0006     7s
+  s0 e04  loss   0.5621   GAUC 0.6679  nDCG@5 0.5361  valid 0.6020  +0.0004     6s
+  s0 e05  loss   0.5598   GAUC 0.6688  nDCG@5 0.5363  valid 0.6026  +0.0010     6s
+  s0 e06  loss   0.5592   GAUC 0.6698  nDCG@5 0.5367  valid 0.6033  +0.0017     5s
+  s0 e07  loss   0.5568   GAUC 0.6672  nDCG@5 0.5364  valid 0.6018  +0.0002     5s
+  s0 e08  loss   0.5552   GAUC 0.6682  nDCG@5 0.5361  valid 0.6022  +0.0006     5s
+  s0 e09  loss   0.5535   GAUC 0.6686  nDCG@5 0.5358  valid 0.6022  +0.0006     5s
+  s0 e10  loss   0.5510   GAUC 0.6703  nDCG@5 0.5366  valid 0.6034  +0.0018     5s
+  s0 e11  loss   0.5490   GAUC 0.6673  nDCG@5 0.5353  valid 0.6013  -0.0003     5s
+  s0 e12  loss   0.5467   GAUC 0.6681  nDCG@5 0.5354  valid 0.6018  +0.0002     5s
+  s0 e13  loss   0.5445   GAUC 0.6676  nDCG@5 0.5358  valid 0.6017  +0.0001     5s
+  s0 e14  loss   0.5410   GAUC 0.6662  nDCG@5 0.5348  valid 0.6005  -0.0011     5s
+  s0 done: best 0.6034 @ep10  (14 epochs)
+  s1 e01  loss   0.6192   GAUC 0.6657  nDCG@5 0.5347  valid 0.6002  -0.0014     5s
+  s1 e02  loss   0.5675   GAUC 0.6687  nDCG@5 0.5359  valid 0.6023  +0.0007     5s
+  s1 e03  loss   0.5639   GAUC 0.6676  nDCG@5 0.5359  valid 0.6018  +0.0002     5s
+  s1 e04  loss   0.5616   GAUC 0.6687  nDCG@5 0.5362  valid 0.6025  +0.0009     5s
+  s1 e05  loss   0.5603   GAUC 0.6677  nDCG@5 0.5359  valid 0.6018  +0.0002     5s
+  s1 e06  loss   0.5590   GAUC 0.6681  nDCG@5 0.5363  valid 0.6022  +0.0006     5s
+  s1 e07  loss   0.5583   GAUC 0.6677  nDCG@5 0.5356  valid 0.6017  +0.0001     5s
+  s1 e08  loss   0.5564   GAUC 0.6687  nDCG@5 0.5363  valid 0.6025  +0.0009     5s
+  s1 done: best 0.6025 @ep4  (8 epochs)
+
+=== iter fm_bpr 3/4  fm_dropout/bpr k=16 p=0.2568939500022583 lr=0.0013460299396830223 l2=0.00011220679728964086 batch=8192 group_size=8
+    [fm_bpr] bayes
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   0.6182   GAUC 0.6635  nDCG@5 0.5334  valid 0.5985  -0.0031     5s
+  s0 e02  loss   0.5671   GAUC 0.6657  nDCG@5 0.5342  valid 0.5999  -0.0017     5s
+  s0 e03  loss   0.5641   GAUC 0.6683  nDCG@5 0.5362  valid 0.6022  +0.0006     5s
+  s0 e04  loss   0.5622   GAUC 0.6678  nDCG@5 0.5362  valid 0.6020  +0.0004     5s
+  s0 e05  loss   0.5600   GAUC 0.6687  nDCG@5 0.5363  valid 0.6025  +0.0009     5s
+  s0 e06  loss   0.5594   GAUC 0.6698  nDCG@5 0.5367  valid 0.6032  +0.0016     5s
+  s0 e07  loss   0.5570   GAUC 0.6675  nDCG@5 0.5364  valid 0.6019  +0.0003     5s
+  s0 e08  loss   0.5553   GAUC 0.6682  nDCG@5 0.5361  valid 0.6022  +0.0006     5s
+  s0 e09  loss   0.5537   GAUC 0.6687  nDCG@5 0.5359  valid 0.6023  +0.0007     5s
+  s0 e10  loss   0.5511   GAUC 0.6702  nDCG@5 0.5365  valid 0.6034  +0.0018     5s
+  s0 e11  loss   0.5491   GAUC 0.6672  nDCG@5 0.5352  valid 0.6012  -0.0004     5s
+  s0 e12  loss   0.5468   GAUC 0.6678  nDCG@5 0.5353  valid 0.6015  -0.0001     5s
+  s0 e13  loss   0.5446   GAUC 0.6673  nDCG@5 0.5356  valid 0.6015  -0.0001     5s
+  s0 e14  loss   0.5411   GAUC 0.6664  nDCG@5 0.5349  valid 0.6006  -0.0010     5s
+  s0 done: best 0.6034 @ep10  (14 epochs)
+  s1 e01  loss   0.6186   GAUC 0.6657  nDCG@5 0.5347  valid 0.6002  -0.0014     5s
+  s1 e02  loss   0.5675   GAUC 0.6688  nDCG@5 0.5359  valid 0.6024  +0.0008     5s
+  s1 e03  loss   0.5640   GAUC 0.6675  nDCG@5 0.5358  valid 0.6017  +0.0001     5s
+  s1 e04  loss   0.5618   GAUC 0.6688  nDCG@5 0.5362  valid 0.6025  +0.0009     5s
+  s1 e05  loss   0.5605   GAUC 0.6676  nDCG@5 0.5358  valid 0.6017  +0.0001     5s
+  s1 e06  loss   0.5592   GAUC 0.6682  nDCG@5 0.5363  valid 0.6022  +0.0006     5s
+  s1 e07  loss   0.5585   GAUC 0.6677  nDCG@5 0.5355  valid 0.6016  +0.0000     5s
+  s1 e08  loss   0.5566   GAUC 0.6687  nDCG@5 0.5362  valid 0.6024  +0.0008     5s
+  s1 done: best 0.6025 @ep4  (8 epochs)
+
+=== iter fm_bpr 4/4  fm_dropout/bpr k=16 p=0.25008389375689216 lr=0.0013199554358017075 l2=0.00010704751337574736 batch=8192 group_size=8
+    [fm_bpr] bayes
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   0.6186   GAUC 0.6637  nDCG@5 0.5336  valid 0.5987  -0.0029     5s
+  s0 e02  loss   0.5667   GAUC 0.6657  nDCG@5 0.5342  valid 0.5999  -0.0017     5s
+  s0 e03  loss   0.5638   GAUC 0.6683  nDCG@5 0.5361  valid 0.6022  +0.0006     5s
+  s0 e04  loss   0.5618   GAUC 0.6678  nDCG@5 0.5361  valid 0.6020  +0.0004     5s
+  s0 e05  loss   0.5595   GAUC 0.6689  nDCG@5 0.5365  valid 0.6027  +0.0011     5s
+  s0 e06  loss   0.5589   GAUC 0.6699  nDCG@5 0.5368  valid 0.6034  +0.0018     5s
+  s0 e07  loss   0.5565   GAUC 0.6676  nDCG@5 0.5363  valid 0.6019  +0.0003     5s
+  s0 e08  loss   0.5548   GAUC 0.6685  nDCG@5 0.5363  valid 0.6024  +0.0008     5s
+  s0 e09  loss   0.5532   GAUC 0.6687  nDCG@5 0.5360  valid 0.6024  +0.0008     5s
+  s0 e10  loss   0.5506   GAUC 0.6705  nDCG@5 0.5366  valid 0.6035  +0.0019     5s
+  s0 e11  loss   0.5486   GAUC 0.6676  nDCG@5 0.5354  valid 0.6015  -0.0001     5s
+  s0 e12  loss   0.5462   GAUC 0.6680  nDCG@5 0.5352  valid 0.6016  -0.0000     5s
+  s0 e13  loss   0.5439   GAUC 0.6673  nDCG@5 0.5356  valid 0.6014  -0.0002     5s
+  s0 e14  loss   0.5402   GAUC 0.6661  nDCG@5 0.5349  valid 0.6005  -0.0011     5s
+  s0 done: best 0.6035 @ep10  (14 epochs)
+  s1 e01  loss   0.6191   GAUC 0.6658  nDCG@5 0.5347  valid 0.6003  -0.0013     5s
+  s1 e02  loss   0.5671   GAUC 0.6690  nDCG@5 0.5361  valid 0.6026  +0.0010     5s
+  s1 e03  loss   0.5636   GAUC 0.6678  nDCG@5 0.5360  valid 0.6019  +0.0003     5s
+  s1 e04  loss   0.5613   GAUC 0.6687  nDCG@5 0.5363  valid 0.6025  +0.0009     5s
+  s1 e05  loss   0.5600   GAUC 0.6679  nDCG@5 0.5359  valid 0.6019  +0.0003     5s
+  s1 e06  loss   0.5586   GAUC 0.6683  nDCG@5 0.5365  valid 0.6024  +0.0008     5s
+  s1 done: best 0.6026 @ep2  (6 epochs)
+
+### family fm_lambda
+
+=== iter fm_lambda 1/4  fm_dropout/lambdarank k=16 p=0.626774463677973 lr=0.0008002444610136346 l2=0.001065730494680154 batch=8192 group_size=5
+    [fm_lambda] init
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   0.8345   GAUC 0.6566  nDCG@5 0.5309  valid 0.5938  -0.0078    14s
+  s0 e02  loss   0.7573   GAUC 0.6598  nDCG@5 0.5323  valid 0.5961  -0.0055    14s
+  s0 e03  loss   0.7461   GAUC 0.6597  nDCG@5 0.5323  valid 0.5960  -0.0056    14s
+  s0 e04  loss   0.7426   GAUC 0.6571  nDCG@5 0.5312  valid 0.5941  -0.0075    15s
+  s0 e05  loss   0.7411   GAUC 0.6564  nDCG@5 0.5315  valid 0.5940  -0.0076    14s
+  s0 e06  loss   0.7403   GAUC 0.6565  nDCG@5 0.5315  valid 0.5940  -0.0076    15s
+  s0 done: best 0.5961 @ep2  (6 epochs)
+  s1 e01  loss   0.8348   GAUC 0.6561  nDCG@5 0.5306  valid 0.5934  -0.0082    14s
+  s1 e02  loss   0.7572   GAUC 0.6602  nDCG@5 0.5326  valid 0.5964  -0.0052    14s
+  s1 e03  loss   0.7459   GAUC 0.6593  nDCG@5 0.5320  valid 0.5956  -0.0060    14s
+  s1 e04  loss   0.7426   GAUC 0.6574  nDCG@5 0.5315  valid 0.5945  -0.0071    14s
+  s1 e05  loss   0.7412   GAUC 0.6564  nDCG@5 0.5311  valid 0.5937  -0.0079    14s
+  s1 e06  loss   0.7401   GAUC 0.6575  nDCG@5 0.5317  valid 0.5946  -0.0070    14s
+  s1 done: best 0.5964 @ep2  (6 epochs)
+
+=== iter fm_lambda 2/4  fm_dropout/lambdarank k=16 p=0.28192985234376217 lr=0.000381555299406378 l2=0.0010351660491042442 batch=8192 group_size=6
+    [fm_lambda] init
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.3480   GAUC 0.6527  nDCG@5 0.5283  valid 0.5905  -0.0111    17s
+  s0 e02  loss   1.1929   GAUC 0.6592  nDCG@5 0.5313  valid 0.5952  -0.0064    16s
+  s0 e03  loss   1.1190   GAUC 0.6622  nDCG@5 0.5331  valid 0.5976  -0.0040    17s
+  s0 e04  loss   1.0947   GAUC 0.6637  nDCG@5 0.5339  valid 0.5988  -0.0028    16s
+  s0 e05  loss   1.0879   GAUC 0.6641  nDCG@5 0.5343  valid 0.5992  -0.0024    17s
+  s0 e06  loss   1.0835   GAUC 0.6652  nDCG@5 0.5345  valid 0.5999  -0.0017    17s
+  s0 e07  loss   1.0840   GAUC 0.6644  nDCG@5 0.5345  valid 0.5995  -0.0021    16s
+  s0 e08  loss   1.0818   GAUC 0.6635  nDCG@5 0.5342  valid 0.5989  -0.0027    16s
+  s0 e09  loss   1.0811   GAUC 0.6640  nDCG@5 0.5341  valid 0.5990  -0.0026    16s
+  s0 e10  loss   1.0810   GAUC 0.6644  nDCG@5 0.5343  valid 0.5993  -0.0023    16s
+  s0 done: best 0.5999 @ep6  (10 epochs)
+  s1 e01  loss   1.3504   GAUC 0.6500  nDCG@5 0.5275  valid 0.5887  -0.0129    17s
+  s1 e02  loss   1.1977   GAUC 0.6587  nDCG@5 0.5310  valid 0.5949  -0.0067    22s
+  s1 e03  loss   1.1214   GAUC 0.6619  nDCG@5 0.5328  valid 0.5974  -0.0042    20s
+  s1 e04  loss   1.0950   GAUC 0.6634  nDCG@5 0.5337  valid 0.5986  -0.0030    20s
+  s1 e05  loss   1.0873   GAUC 0.6644  nDCG@5 0.5341  valid 0.5992  -0.0024    20s
+  s1 e06  loss   1.0839   GAUC 0.6645  nDCG@5 0.5339  valid 0.5992  -0.0024    19s
+  s1 e07  loss   1.0814   GAUC 0.6645  nDCG@5 0.5344  valid 0.5994  -0.0022    19s
+  s1 e08  loss   1.0812   GAUC 0.6646  nDCG@5 0.5345  valid 0.5995  -0.0021    22s
+  s1 e09  loss   1.0808   GAUC 0.6640  nDCG@5 0.5339  valid 0.5990  -0.0026    26s
+  s1 e10  loss   1.0836   GAUC 0.6631  nDCG@5 0.5341  valid 0.5986  -0.0030    25s
+  s1 e11  loss   1.0810   GAUC 0.6621  nDCG@5 0.5338  valid 0.5979  -0.0037    23s
+  s1 e12  loss   1.0813   GAUC 0.6637  nDCG@5 0.5345  valid 0.5991  -0.0025    23s
+  s1 done: best 0.5995 @ep8  (12 epochs)
+
+=== iter fm_lambda 3/4  fm_dropout/lambdarank k=16 p=0.28673588213042805 lr=0.0003970350802182993 l2=0.0010590936537669992 batch=8192 group_size=6
+    [fm_lambda] bayes
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.3455   GAUC 0.6529  nDCG@5 0.5284  valid 0.5907  -0.0109    24s
+  s0 e02  loss   1.1871   GAUC 0.6593  nDCG@5 0.5313  valid 0.5953  -0.0063    24s
+  s0 e03  loss   1.1162   GAUC 0.6620  nDCG@5 0.5330  valid 0.5975  -0.0041    23s
+  s0 e04  loss   1.0938   GAUC 0.6633  nDCG@5 0.5338  valid 0.5986  -0.0030    23s
+  s0 e05  loss   1.0878   GAUC 0.6642  nDCG@5 0.5345  valid 0.5994  -0.0022    23s
+  s0 e06  loss   1.0837   GAUC 0.6651  nDCG@5 0.5344  valid 0.5998  -0.0018    25s
+  s0 e07  loss   1.0844   GAUC 0.6641  nDCG@5 0.5345  valid 0.5993  -0.0023    24s
+  s0 e08  loss   1.0823   GAUC 0.6629  nDCG@5 0.5338  valid 0.5983  -0.0033    26s
+  s0 e09  loss   1.0816   GAUC 0.6638  nDCG@5 0.5340  valid 0.5989  -0.0027    24s
+  s0 e10  loss   1.0816   GAUC 0.6643  nDCG@5 0.5343  valid 0.5993  -0.0023    24s
+  s0 done: best 0.5998 @ep6  (10 epochs)
+  s1 e01  loss   1.3473   GAUC 0.6507  nDCG@5 0.5276  valid 0.5891  -0.0125    24s
+  s1 e02  loss   1.1898   GAUC 0.6583  nDCG@5 0.5308  valid 0.5946  -0.0070    26s
+  s1 e03  loss   1.1158   GAUC 0.6621  nDCG@5 0.5328  valid 0.5975  -0.0041    24s
+  s1 e04  loss   1.0929   GAUC 0.6633  nDCG@5 0.5337  valid 0.5985  -0.0031    24s
+  s1 e05  loss   1.0871   GAUC 0.6645  nDCG@5 0.5344  valid 0.5994  -0.0022    24s
+  s1 e06  loss   1.0844   GAUC 0.6646  nDCG@5 0.5340  valid 0.5993  -0.0023    22s
+  s1 e07  loss   1.0821   GAUC 0.6637  nDCG@5 0.5341  valid 0.5989  -0.0027    24s
+  s1 e08  loss   1.0820   GAUC 0.6639  nDCG@5 0.5343  valid 0.5991  -0.0025    26s
+  s1 e09  loss   1.0815   GAUC 0.6641  nDCG@5 0.5341  valid 0.5991  -0.0025    20s
+  s1 done: best 0.5994 @ep5  (9 epochs)
+
+=== iter fm_lambda 4/4  fm_dropout/lambdarank k=16 p=0.24218173099161133 lr=0.0003102268990590154 l2=0.0008633136699639546 batch=8192 group_size=7
+    [fm_lambda] bayes
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.7703   GAUC 0.6521  nDCG@5 0.5284  valid 0.5903  -0.0113    20s
+  s0 e02  loss   1.5853   GAUC 0.6590  nDCG@5 0.5308  valid 0.5949  -0.0067    20s
+  s0 e03  loss   1.4704   GAUC 0.6616  nDCG@5 0.5328  valid 0.5972  -0.0044    20s
+  s0 e04  loss   1.4253   GAUC 0.6637  nDCG@5 0.5335  valid 0.5986  -0.0030    20s
+  s0 e05  loss   1.4074   GAUC 0.6655  nDCG@5 0.5345  valid 0.6000  -0.0016    26s
+  s0 e06  loss   1.3988   GAUC 0.6659  nDCG@5 0.5349  valid 0.6004  -0.0012    27s
+  s0 e07  loss   1.3953   GAUC 0.6663  nDCG@5 0.5347  valid 0.6005  -0.0011    24s
+  s0 e08  loss   1.3937   GAUC 0.6661  nDCG@5 0.5349  valid 0.6005  -0.0011    20s
+  s0 e09  loss   1.3925   GAUC 0.6661  nDCG@5 0.5352  valid 0.6006  -0.0010    20s
+  s0 e10  loss   1.3902   GAUC 0.6657  nDCG@5 0.5348  valid 0.6002  -0.0014    20s
+  s0 e11  loss   1.3928   GAUC 0.6665  nDCG@5 0.5348  valid 0.6007  -0.0009    20s
+  s0 e12  loss   1.3916   GAUC 0.6652  nDCG@5 0.5346  valid 0.5999  -0.0017    28s
+  s0 e13  loss   1.3913   GAUC 0.6659  nDCG@5 0.5353  valid 0.6006  -0.0010    30s
+  s0 e14  loss   1.3898   GAUC 0.6656  nDCG@5 0.5349  valid 0.6002  -0.0014    24s
+  s0 e15  loss   1.3883   GAUC 0.6663  nDCG@5 0.5353  valid 0.6008  -0.0008    21s
+  s0 e16  loss   1.3924   GAUC 0.6660  nDCG@5 0.5348  valid 0.6004  -0.0012    21s
+  s0 e17  loss   1.3902   GAUC 0.6653  nDCG@5 0.5347  valid 0.6000  -0.0016    21s
+  s0 e18  loss   1.3900   GAUC 0.6654  nDCG@5 0.5349  valid 0.6002  -0.0014    21s
+  s0 done: best 0.6008 @ep15  (18 epochs, TIMED OUT)
+  s1 e01  loss   1.7747   GAUC 0.6492  nDCG@5 0.5272  valid 0.5882  -0.0134    21s
+  s1 e02  loss   1.5914   GAUC 0.6589  nDCG@5 0.5308  valid 0.5948  -0.0068    21s
+  s1 e03  loss   1.4755   GAUC 0.6613  nDCG@5 0.5322  valid 0.5968  -0.0048    20s
+  s1 e04  loss   1.4272   GAUC 0.6629  nDCG@5 0.5335  valid 0.5982  -0.0034    20s
+  s1 e05  loss   1.4078   GAUC 0.6644  nDCG@5 0.5341  valid 0.5992  -0.0024    21s
+  s1 e06  loss   1.3984   GAUC 0.6665  nDCG@5 0.5352  valid 0.6009  -0.0007    21s
+  s1 e07  loss   1.3945   GAUC 0.6664  nDCG@5 0.5352  valid 0.6008  -0.0008    21s
+  s1 e08  loss   1.3911   GAUC 0.6661  nDCG@5 0.5351  valid 0.6006  -0.0010    26s
+  s1 e09  loss   1.3914   GAUC 0.6658  nDCG@5 0.5347  valid 0.6002  -0.0014    24s
+  s1 e10  loss   1.3920   GAUC 0.6655  nDCG@5 0.5351  valid 0.6003  -0.0013    27s
+  s1 done: best 0.6009 @ep6  (10 epochs)
+
+### family din_softmax
+
+=== iter din_softmax 1/4  din_dropout/softmax k=16 p=0.2565990536833383 L=11 lr=0.0008487552159093042 l2=0.00017792595580371916 batch=8192 group_size=8
+    [din_softmax] init
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.9737   GAUC 0.6654  nDCG@5 0.5343  valid 0.5998  -0.0018    80s
+  s0 e02  loss   1.8511   GAUC 0.6678  nDCG@5 0.5361  valid 0.6019  +0.0003    70s
+  s0 e03  loss   1.8373   GAUC 0.6675  nDCG@5 0.5357  valid 0.6016  +0.0000    74s
+  s0 e04  loss   1.8330   GAUC 0.6697  nDCG@5 0.5367  valid 0.6032  +0.0016    81s
+  s0 e05  loss   1.8298   GAUC 0.6698  nDCG@5 0.5365  valid 0.6032  +0.0016    77s
+  s0 e06  loss   1.8265   GAUC 0.6688  nDCG@5 0.5362  valid 0.6025  +0.0009    86s
+  s0 done: best 0.6032 @ep4  (6 epochs, TIMED OUT)
+  s1 e01  loss   1.9754   GAUC 0.6654  nDCG@5 0.5345  valid 0.6000  -0.0016    82s
+  s1 e02  loss   1.8520   GAUC 0.6680  nDCG@5 0.5364  valid 0.6022  +0.0006    87s
+  s1 e03  loss   1.8378   GAUC 0.6699  nDCG@5 0.5370  valid 0.6035  +0.0019    90s
+  s1 e04  loss   1.8339   GAUC 0.6687  nDCG@5 0.5359  valid 0.6023  +0.0007    80s
+  s1 e05  loss   1.8296   GAUC 0.6688  nDCG@5 0.5361  valid 0.6025  +0.0009    58s
+  s1 e06  loss   1.8273   GAUC 0.6693  nDCG@5 0.5367  valid 0.6030  +0.0014    58s
+  s1 done: best 0.6035 @ep3  (6 epochs, TIMED OUT)
+
+=== iter din_softmax 2/4  din_dropout/softmax k=16 p=0.525000235904048 L=24 lr=0.0004086331392238052 l2=0.00023989893451258274 batch=8192 group_size=8
+    [din_softmax] init
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   2.0360   GAUC 0.6612  nDCG@5 0.5319  valid 0.5965  -0.0051   123s
+  s0 e02  loss   1.9288   GAUC 0.6656  nDCG@5 0.5350  valid 0.6003  -0.0013   103s
+  s0 e03  loss   1.8864   GAUC 0.6663  nDCG@5 0.5352  valid 0.6008  -0.0008   100s
+  s0 e04  loss   1.8721   GAUC 0.6683  nDCG@5 0.5355  valid 0.6019  +0.0003    99s
+  s0 done: best 0.6019 @ep4  (4 epochs, TIMED OUT)
+  s1 e01  loss   2.0374   GAUC 0.6601  nDCG@5 0.5314  valid 0.5958  -0.0058    91s
+  s1 e02  loss   1.9300   GAUC 0.6655  nDCG@5 0.5345  valid 0.6000  -0.0016    98s
+  s1 e03  loss   1.8863   GAUC 0.6678  nDCG@5 0.5357  valid 0.6017  +0.0001    94s
+  s1 e04  loss   1.8720   GAUC 0.6677  nDCG@5 0.5355  valid 0.6016  +0.0000    86s
+  s1 e05  loss   1.8631   GAUC 0.6680  nDCG@5 0.5356  valid 0.6018  +0.0002    97s
+  s1 done: best 0.6018 @ep5  (5 epochs, TIMED OUT)
+
+=== iter din_softmax 3/4  din_dropout/softmax k=16 p=0.25239361482274736 L=11 lr=0.0008493160186324645 l2=0.00018906432478865646 batch=8192 group_size=8
+    [din_softmax] bayes
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.9738   GAUC 0.6655  nDCG@5 0.5344  valid 0.5999  -0.0017    97s
+  s0 e02  loss   1.8515   GAUC 0.6677  nDCG@5 0.5361  valid 0.6019  +0.0003    97s
+  s0 e03  loss   1.8378   GAUC 0.6674  nDCG@5 0.5356  valid 0.6015  -0.0001    97s
+  s0 e04  loss   1.8338   GAUC 0.6697  nDCG@5 0.5367  valid 0.6032  +0.0016    97s
+  s0 e05  loss   1.8308   GAUC 0.6696  nDCG@5 0.5365  valid 0.6031  +0.0015    96s
+  s0 done: best 0.6032 @ep4  (5 epochs, TIMED OUT)
+  s1 e01  loss   1.9755   GAUC 0.6653  nDCG@5 0.5346  valid 0.5999  -0.0017    96s
+  s1 e02  loss   1.8523   GAUC 0.6679  nDCG@5 0.5363  valid 0.6021  +0.0005    96s
+  s1 e03  loss   1.8382   GAUC 0.6699  nDCG@5 0.5371  valid 0.6035  +0.0019    96s
+  s1 e04  loss   1.8345   GAUC 0.6687  nDCG@5 0.5359  valid 0.6023  +0.0007    96s
+  s1 e05  loss   1.8305   GAUC 0.6686  nDCG@5 0.5361  valid 0.6024  +0.0008    96s
+  s1 done: best 0.6035 @ep3  (5 epochs, TIMED OUT)
+
+=== iter din_softmax 4/4  din_dropout/softmax k=16 p=0.251783447330306 L=11 lr=0.0008439222102108924 l2=0.0001730928686843452 batch=8192 group_size=8
+    [din_softmax] bayes
+    seeds=[0, 1]  budget=400s/seed  FM baseline=0.6016
+  s0 e01  loss   1.9740   GAUC 0.6654  nDCG@5 0.5342  valid 0.5998  -0.0018    97s
+  s0 e02  loss   1.8508   GAUC 0.6679  nDCG@5 0.5362  valid 0.6020  +0.0004    96s
+  s0 e03  loss   1.8367   GAUC 0.6674  nDCG@5 0.5357  valid 0.6016  -0.0000    78s
+  s0 e04  loss   1.8324   GAUC 0.6699  nDCG@5 0.5368  valid 0.6034  +0.0018    45s
+  s0 e05  loss   1.8291   GAUC 0.6699  nDCG@5 0.5364  valid 0.6032  +0.0016    46s
+  s0 e06  loss   1.8258   GAUC 0.6688  nDCG@5 0.5361  valid 0.6025  +0.0009    45s
+  s0 done: best 0.6034 @ep4  (6 epochs, TIMED OUT)
+  s1 e01  loss   1.9756   GAUC 0.6653  nDCG@5 0.5345  valid 0.5999  -0.0017    45s
+  s1 e02  loss   1.8516   GAUC 0.6680  nDCG@5 0.5364  valid 0.6022  +0.0006    44s
+  s1 e03  loss   1.8371   GAUC 0.6698  nDCG@5 0.5370  valid 0.6034  +0.0018    45s
+  s1 e04  loss   1.8333   GAUC 0.6687  nDCG@5 0.5358  valid 0.6023  +0.0007    45s
+  s1 e05  loss   1.8290   GAUC 0.6687  nDCG@5 0.5361  valid 0.6024  +0.0008    47s
+  s1 e06  loss   1.8267   GAUC 0.6692  nDCG@5 0.5367  valid 0.6029  +0.0013    48s
+  s1 e07  loss   1.8235   GAUC 0.6703  nDCG@5 0.5369  valid 0.6036  +0.0020    49s
+  s1 e08  loss   1.8199   GAUC 0.6699  nDCG@5 0.5366  valid 0.6032  +0.0016    51s
+  s1 e09  loss   1.8164   GAUC 0.6701  nDCG@5 0.5366  valid 0.6034  +0.0018    54s
+  s1 done: best 0.6036 @ep7  (9 epochs, TIMED OUT)
+
+### greedy ensemble selection over 32 models
+    bag 1/5: 5 members, valid 0.6052
+    bag 2/5: 5 members, valid 0.6052
+    bag 3/5: 5 members, valid 0.6053
+    bag 4/5: 3 members, valid 0.6049
+    bag 5/5: 5 members, valid 0.6050
+
+========================================================================
+searched 32 models in 116 min
+best single      0.6039
+mean single      0.6021
+ENSEMBLE valid   0.6054   (+0.0014 vs best single, +0.0038 vs FM baseline)
+ensemble unbiased 0.3735  (independent check -- should move the same way)
+members (weight, model):
+   0.187  fm_softmax#3:s1
+   0.187  fm_softmax#0:s0
+   0.160  fm_softmax#2:s1
+   0.120  fm_bpr#1:s0
+   0.080  fm_softmax#0:s1
+   0.067  din_softmax#3:s1
+   0.040  fm_softmax#3:s0
+   0.040  fm_softmax#1:s0
+   0.040  fm_lambda#3:s0
+   0.040  fm_bpr#3:s0
+   0.040  fm_bpr#2:s1
+noise floor is ~0.0012; treat smaller differences as ties.
+
+wrote runs/ensemble_search.json

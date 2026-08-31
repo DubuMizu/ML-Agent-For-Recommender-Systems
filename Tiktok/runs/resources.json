@@ -1,0 +1,13 @@
+{
+  "iterations_used": 138,
+  "iterations_this_session": 16,
+  "llm_tokens_in": 0,
+  "llm_tokens_out": 0,
+  "llm_cost_usd": 0.0,
+  "agent_wall_clock_min": 92.6,
+  "llm_cost_usd_by_model": {},
+  "gpu_hours": 0.0,
+  "manual_interventions": 0,
+  "blocked_writes_to_protected_files": 0,
+  "device": "CPU only (no GPU used)"
+}

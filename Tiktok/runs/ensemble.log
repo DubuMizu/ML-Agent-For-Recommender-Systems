@@ -1,0 +1,26 @@
+  fmdrop_p3:s0     valid 0.6035  (best ep 4, 8 epochs)
+  fmdrop_p3:s1     valid 0.6034  (best ep 2, 6 epochs)
+  fmdrop_p3:s2     valid 0.6036  (best ep 4, 8 epochs)
+  fmdrop_p5:s0     valid 0.6035  (best ep 5, 9 epochs)
+  fmdrop_p5:s1     valid 0.6038  (best ep 9, 13 epochs)
+  fmdrop_p5:s2     valid 0.6038  (best ep 4, 8 epochs)
+  din_p3:s0        valid 0.6039  (best ep 4, 8 epochs)
+  din_p3:s1        valid 0.6032  (best ep 1, 5 epochs)
+  din_p3:s2        valid 0.6037  (best ep 2, 6 epochs)
+training took 33 min
+
+combination                                   valid unbiased     vs FM
+------------------------------------------------------------------------
+single model (mean of 9)                     0.6036        -   +0.0020
+fmdrop_p3 x3 seeds                           0.6043   0.3715   +0.0027
+fmdrop_p5 x3 seeds                           0.6042   0.3712   +0.0026
+din_p3 x3 seeds                              0.6045   0.3730   +0.0029
+fmdrop_p3+fmdrop_p5 x3                       0.6045   0.3717   +0.0029
+fmdrop_p3+din_p3 x3                          0.6044   0.3724   +0.0028
+fmdrop_p5+din_p3 x3                          0.6043   0.3723   +0.0027
+ALL 3 configs x 3 seeds (9 models)           0.6046   0.3722   +0.0030  <-- best
+
+best single model : 0.6039
+best ensemble     : 0.6046  (ALL 3 configs x 3 seeds (9 models))
+ensemble gain     : +0.0007 over the best single model
+total vs FM       : +0.0030
