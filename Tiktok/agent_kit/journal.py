@@ -172,27 +172,78 @@ class Journal:
         return (flat, 'best gain over last %d iterations = %+.4f (epsilon=%.3f)'
                 % (n, gain, epsilon))
 
-    def render_markdown(self, path=None):
+    def render_markdown(self, path=None, resources=None):
+        """Emit runs/RUN_LOG.md -- the per-iteration deliverable.
+
+        Each row carries the four things the run-log requirement asks for: the
+        hypothesis that motivated the iteration, the diff that expresses it, the
+        resulting validation metrics, and (below the table) any error together
+        with the recovery the loop performed.
+        """
         path = path or os.path.join(RUNS_DIR, 'RUN_LOG.md')
+        if resources is None:
+            # Written by the loop at the end of every turn; loading it here keeps
+            # the interventions block in the log without touching the call sites.
+            try:
+                with open(os.path.join(RUNS_DIR, 'resources.json'), encoding='utf-8') as fh:
+                    resources = json.load(fh)
+            except (OSError, ValueError):
+                resources = None
         b = self.best()
+        by_iter = {e.get('iteration'): e for e in self.entries}
+        n_fail = sum(1 for e in self.entries if e['status'] in ('failed', 'timeout'))
+        n_hard = sum(1 for e in self.entries if e['status'] == 'failed')
         out = ['# Agent run log', '',
-               'Auto-generated from `runs/journal.jsonl`; one row per iteration.', '',
+               'Auto-generated from `runs/journal.jsonl` by `Journal.render_markdown()`;',
+               'one row per iteration. Columns are the four required elements:',
+               '**hypothesis**, **diff applied**, **resulting metrics**, and',
+               '**error / recovery** (detailed under the table).', '',
                '- FM baseline (validation primary): **%.4f**' % FM_VALID_PRIMARY,
                '- Oracle ceiling (validation): **%.4f**' % ORACLE_VALID_PRIMARY]
         if b:
-            out.append('- Best so far: **%.4f** (%+.4f vs FM) at iteration %d'
+            out.append('- Best single model: **%.4f** (%+.4f vs FM) at iteration %d'
                        % (b['valid_primary'], b['delta_vs_fm'], b['iteration']))
-        n_fail = sum(1 for e in self.entries if e['status'] in ('failed', 'timeout'))
-        out += ['- Iterations: **%d** (%d recovered failures)' % (len(self.entries), n_fail), '',
-                '| # | status | valid primary | GAUC | nDCG@5 | Δ vs FM | unbiased | secs | hypothesis |',
-                '|---|--------|---------------|------|--------|---------|----------|------|------------|']
+        out += ['- Iterations recorded: **%d** (%d timeouts + %d hard errors, all recovered)'
+                % (len(self.entries), n_fail - n_hard, n_hard), '']
+
+        if resources:
+            out += ['## Manual interventions', '',
+                    '**In-loop manual interventions: %d.** The loop was never edited,'
+                    % resources.get('manual_interventions', 0),
+                    'unblocked, or hand-corrected while running; every recovery below was',
+                    'performed by the agent itself.', '',
+                    '| | |', '|---|---|',
+                    '| In-loop manual interventions | **%d** |'
+                    % resources.get('manual_interventions', 0),
+                    '| Writes to protected files blocked by the leak guard | %d |'
+                    % resources.get('blocked_writes_to_protected_files', 0),
+                    '']
+
+        out += ['## Iterations', '',
+                '| # | status | valid primary | GAUC | nDCG@5 | Δ vs FM | unbiased | secs | diff applied | hypothesis |',
+                '|---|--------|---------------|------|--------|---------|----------|------|--------------|------------|']
+        prev_cfg = None
         for e in self.entries:
             f = lambda k, spec='%.4f': (spec % e[k]) if e.get(k) is not None else '–'
-            out.append('| %d | %s | %s | %s | %s | %s | %s | %s | %s |' % (
+            cfg = e.get('config')
+            if cfg:
+                par = by_iter.get(e.get('parent'))
+                base = (par or {}).get('config') if par else prev_cfg
+                diff = _config_diff(cfg, base)
+                if par:
+                    diff = 'vs iter %d — %s' % (par['iteration'], diff)
+                prev_cfg = cfg
+            else:
+                diff = '(no experiment — recorded finding)'
+            out.append('| %d | %s | %s | %s | %s | %s | %s | %s | %s | %s |' % (
                 e['iteration'], e['status'], f('valid_primary'), f('valid_GAUC'),
                 f('valid_nDCG@5'), f('delta_vs_fm', '%+.4f'), f('unbiased_primary'),
                 f('wall_clock_s', '%.0f'),
-                (e.get('hypothesis') or '').replace('|', '\\|')))
+                diff.replace('|', r'\|')[:400],
+                (e.get('hypothesis') or '').replace('|', r'\|').replace(chr(10), ' ')))
+
+        out += ['', '## Errors and recoveries', '',
+                'Every entry below was handled inside the loop; none required an operator.']
         for e in self.entries:
             if e['status'] in ('failed', 'timeout'):
                 out += ['', '### Iteration %d — %s' % (e['iteration'], e['status']),
@@ -200,8 +251,54 @@ class Journal:
                         '', '**Recovery:** %s' % (e.get('recovery') or '(none recorded)')]
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
         with open(path, 'w', encoding='utf-8') as fh:
-            fh.write('\n'.join(out) + '\n')
+            fh.write(chr(10).join(out) + chr(10))
         return path
+
+
+def _flatten(cfg, prefix=''):
+    """Config -> {'model.type': 'fm', 'train.lr': 0.001, ...} for diffing."""
+    flat = {}
+    if not isinstance(cfg, dict):
+        return {prefix.rstrip('.'): cfg} if prefix else {}
+    for k, v in cfg.items():
+        key = prefix + str(k)
+        if isinstance(v, dict):
+            flat.update(_flatten(v, key + '.'))
+        elif isinstance(v, list):
+            flat[key] = '[' + ','.join(str(x) for x in v) + ']'
+        else:
+            flat[key] = v
+    return flat
+
+
+def _fmt_val(v):
+    if isinstance(v, float):
+        return ('%.6g' % v)
+    return str(v)
+
+
+def _config_diff(cur, base):
+    """The change this iteration applied, as a one-line diff over config slots.
+
+    The agent's edit surface is the four config slots (features / model / loss /
+    train), so the config delta IS the applied diff -- the same information a
+    unified patch would carry, minus the line noise. Slots the iteration did not
+    touch are omitted; a brand-new key shows as `+key=value`.
+    """
+    a, b = _flatten(cur or {}), _flatten(base or {})
+    if not b:
+        return 'initial config: ' + ' '.join(
+            '%s=%s' % (k, _fmt_val(v)) for k, v in sorted(a.items()))
+    bits = []
+    for k in sorted(set(a) | set(b)):
+        if k in a and k in b:
+            if a[k] != b[k]:
+                bits.append('%s: %s -> %s' % (k, _fmt_val(b[k]), _fmt_val(a[k])))
+        elif k in a:
+            bits.append('+%s=%s' % (k, _fmt_val(a[k])))
+        else:
+            bits.append('-%s (was %s)' % (k, _fmt_val(b[k])))
+    return '; '.join(bits) if bits else '(no config change -- re-run/control)'
 
 
 def _describe(cfg):

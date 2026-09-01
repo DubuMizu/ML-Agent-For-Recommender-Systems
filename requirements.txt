@@ -1,0 +1,11 @@
+# The research harness. Pinned to what the reported run used.
+torch==2.13.0            # CPU wheel is sufficient; no GPU is used anywhere
+numpy==2.3.2
+
+# The autonomous loop. Only needed to RUN the agent -- reproducing the
+# submission from the journal needs just torch + numpy.
+claude-agent-sdk==0.2.148
+
+# The official starter-kit evaluator (evaluate.py) needs numpy only.
+# pandas is used by the starter kit's own loader, not by agent_kit.
+pandas>=2.0

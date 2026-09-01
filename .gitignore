@@ -1,1 +1,11 @@
+# Encoder/frame caches -- large, regenerated deterministically on first run.
 .cache/
+Tiktok/.cache/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Working scratch from the agent loop
+Tiktok/runs/*.bak*
+Tiktok/runs/agent.pid
