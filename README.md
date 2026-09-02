@@ -232,7 +232,6 @@ ensemble. See [RESULTS.md](RESULTS.md) §1.
 
 ## Team
 
-Solo participant — **DubuMizu** (aarontanweiheng@gmail.com). All components (harness, agent loop,
-leak guard, tuner, ensemble search, dashboard, and this write-up) are my own work; the ML results
+Participants — **DubuMizu**, **dkjw75**, **maxwellguico**, **smellywesley**, **shaunpann**. The ML results
 were produced by the agent described above. The Starter Kit files (`evaluate.py`, `data.py`,
 `baseline.py`, `submit.py`, `ablation_features.py`) are the organisers' and are unmodified.
